@@ -35,7 +35,6 @@ export default function Dashboard() {
   }
 
   async function loadLatestScan(domain_id, org_id) {
-    // Buscar el último scan completado
     const { data: scans } = await supabase
       .from('scans')
       .select('*')
@@ -46,7 +45,6 @@ export default function Dashboard() {
 
     if (scans && scans.length > 0) {
       setScan(scans[0])
-      // Cargar findings del scan
       const { data: findingsData } = await supabase
         .from('findings')
         .select('*')
@@ -68,6 +66,8 @@ export default function Dashboard() {
           domain: domain.domain,
           org_id: org.id,
           domain_id: domain.id,
+          org_name: org.name,
+          org_email: org.email,
         })
       })
       const data = await res.json()
@@ -85,7 +85,6 @@ export default function Dashboard() {
     navigate('/login')
   }
 
-  // Calcular estado general
   const score = scan?.score || 0
   const hasCritical = findings.some(f => f.severity === 'critical')
   const hasHigh = findings.some(f => f.severity === 'high')
@@ -94,7 +93,6 @@ export default function Dashboard() {
   const stateLabelPlain = hasCritical ? 'Hay problemas críticos que resolver ya' : hasHigh ? 'Vas bien, con tareas pendientes' : 'Tu empresa está protegida'
   const circumference = 402
 
-  // Agrupar findings por categoría para las áreas
   const areaStatus = (category) => {
     const f = findings.filter(f => f.category === category)
     if (f.some(x => x.severity === 'critical')) return 'crit'

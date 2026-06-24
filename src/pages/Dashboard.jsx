@@ -60,7 +60,6 @@ const FRAMEWORKS = {
   },
 }
 
-// Inferir ley de datos personales del TLD
 function getDataLaw(domain) {
   if (!domain) return null
   const tld = domain.split('.').slice(-2).join('.').toLowerCase()
@@ -91,9 +90,18 @@ export default function Dashboard() {
   const [view, setView] = useState('owner')
   const [loading, setLoading] = useState(true)
   const [scanning, setScanning] = useState(false)
+  const [checkingOut, setCheckingOut] = useState(false)
   const navigate = useNavigate()
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    loadData()
+    // Chequear si viene de Stripe
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('payment') === 'success') {
+      alert('🎉 ¡Suscripción activada! Bienvenido a HAVEN.')
+      window.history.replaceState({}, '', '/dashboard')
+    }
+  }, [])
 
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -115,21 +123,14 @@ export default function Dashboard() {
 
   async function loadLatestScan(domain_id, org_id) {
     const { data: scans } = await supabase
-      .from('scans')
-      .select('*')
-      .eq('domain_id', domain_id)
-      .eq('status', 'completed')
-      .order('created_at', { ascending: false })
-      .limit(1)
+      .from('scans').select('*').eq('domain_id', domain_id)
+      .eq('status', 'completed').order('created_at', { ascending: false }).limit(1)
 
     if (scans && scans.length > 0) {
       setScan(scans[0])
       const { data: findingsData } = await supabase
-        .from('findings')
-        .select('*')
-        .eq('scan_id', scans[0].id)
-        .eq('status', 'open')
-        .order('severity', { ascending: true })
+        .from('findings').select('*').eq('scan_id', scans[0].id)
+        .eq('status', 'open').order('severity', { ascending: true })
       setFindings(findingsData || [])
     }
   }
@@ -142,21 +143,38 @@ export default function Dashboard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          domain: domain.domain,
-          org_id: org.id,
-          domain_id: domain.id,
-          org_name: org.name,
-          org_email: org.email,
+          domain: domain.domain, org_id: org.id, domain_id: domain.id,
+          org_name: org.name, org_email: org.email,
         })
       })
       const data = await res.json()
-      if (data.ok) {
-        await loadLatestScan(domain.id, org.id)
-      }
+      if (data.ok) await loadLatestScan(domain.id, org.id)
     } catch (e) {
       console.error('Error corriendo scan:', e)
     }
     setScanning(false)
+  }
+
+  async function handleCheckout() {
+    if (!org) return
+    setCheckingOut(true)
+    try {
+      const res = await fetch(`${SCANNER_URL}/create-checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          org_id: org.id,
+          email: org.email,
+          plan: org.plan || 'advanced',
+          domain: domain?.domain,
+        })
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+    } catch (e) {
+      console.error('Error creando checkout:', e)
+    }
+    setCheckingOut(false)
   }
 
   async function handleLogout() {
@@ -171,6 +189,8 @@ export default function Dashboard() {
   const stateLabel = hasCritical ? 'Acción inmediata' : hasHigh ? 'Atención requerida' : score >= 90 ? 'Protegido' : 'Atención requerida'
   const stateLabelPlain = hasCritical ? 'Hay problemas críticos que resolver ya' : hasHigh ? 'Vas bien, con tareas pendientes' : 'Tu empresa está protegida'
   const circumference = 402
+  const isTrial = org?.status === 'trialing'
+  const trialDaysLeft = daysLeft(org?.trial_ends_at)
 
   const areaStatus = (category) => {
     const f = findings.filter(f => f.category === category)
@@ -217,8 +237,7 @@ export default function Dashboard() {
             <div style={s.topRight}>
               {domain && (
                 <div style={s.domainChip}>
-                  <span style={s.dot} />
-                  {domain.domain}
+                  <span style={s.dot} />{domain.domain}
                 </div>
               )}
               <div style={s.roleSwitch}>
@@ -237,6 +256,22 @@ export default function Dashboard() {
       <main style={s.main}>
         <div style={s.wrap}>
 
+          {/* TRIAL BANNER */}
+          {isTrial && (
+            <div style={s.trialBanner}>
+              <div>
+                <b style={{ color: '#EDF1F8' }}>Estás en prueba gratuita</b>
+                <span style={{ color: '#93A1BC', fontSize: 13, marginLeft: 8 }}>
+                  {trialDaysLeft > 0 ? `Te quedan ${trialDaysLeft} días` : 'Tu trial venció hoy'}
+                </span>
+              </div>
+              <button style={s.trialBtn} onClick={handleCheckout} disabled={checkingOut}>
+                {checkingOut ? 'Redirigiendo...' : `Activar plan ${org?.plan?.toUpperCase() || 'ADVANCED'} · $${org?.plan === 'elite' ? '299' : org?.plan === 'premium' ? '199' : '99'}/mes →`}
+              </button>
+            </div>
+          )}
+
+          {/* NO SCAN YET */}
           {!scan && !scanning && (
             <div style={s.noScan}>
               <div style={{ fontSize: 40, marginBottom: 16 }}>🛡️</div>
@@ -246,6 +281,7 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* SCANNING */}
           {scanning && (
             <div style={s.noScan}>
               <div style={{ fontSize: 40, marginBottom: 16 }}>🔍</div>
@@ -254,6 +290,7 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* DASHBOARD CON DATOS REALES */}
           {scan && !scanning && (
             <>
               {/* HERO */}
@@ -293,7 +330,7 @@ export default function Dashboard() {
                     <div><div style={s.metaK}>Último scan</div><div style={s.metaV}>hace <b style={{ color: '#2DD4BF' }}>{timeSince(scan.completed_at)}</b></div></div>
                     <div><div style={s.metaK}>Hallazgos</div><div style={s.metaV}><b style={{ color: stateColor }}>{findings.length}</b> abiertos</div></div>
                     <div><div style={s.metaK}>Plan</div><div style={s.metaV}>{org?.plan?.toUpperCase()}</div></div>
-                    <div><div style={s.metaK}>Trial</div><div style={s.metaV}><b style={{ color: '#2DD4BF' }}>{daysLeft(org?.trial_ends_at)} días</b> restantes</div></div>
+                    <div><div style={s.metaK}>Trial</div><div style={s.metaV}><b style={{ color: '#2DD4BF' }}>{trialDaysLeft} días</b> restantes</div></div>
                   </div>
                 </div>
               </section>
@@ -324,8 +361,7 @@ export default function Dashboard() {
                       <div style={s.areaNote}>
                         {view === 'owner'
                           ? (areaFindings.length > 0 ? areaFindings[0].title_plain : a.plain)
-                          : (areaFindings.length > 0 ? areaFindings[0].description_tech : a.tech)
-                        }
+                          : (areaFindings.length > 0 ? areaFindings[0].description_tech : a.tech)}
                       </div>
                     </div>
                   )
@@ -380,12 +416,8 @@ export default function Dashboard() {
                           {compTot - compHit} pendiente{compTot - compHit !== 1 ? 's' : ''}
                         </span>
                       </div>
-                      <div style={s.compBar}>
-                        <div style={{ ...s.compFill, width: `${compPct}%` }} />
-                      </div>
-                      <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: '#5E6C87', marginTop: 8 }}>
-                        {framework.sub}
-                      </div>
+                      <div style={s.compBar}><div style={{ ...s.compFill, width: `${compPct}%` }} /></div>
+                      <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: '#5E6C87', marginTop: 8 }}>{framework.sub}</div>
                     </div>
                     <div style={s.compRing}>
                       <svg style={{ transform: 'rotate(-90deg)', width: 80, height: 80 }} viewBox="0 0 80 80">
@@ -413,9 +445,7 @@ export default function Dashboard() {
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 14, fontWeight: 600, color: '#EDF1F8' }}>{c.name}</div>
-                          <div style={{ fontSize: 13, color: '#93A1BC', marginTop: 3 }}>
-                            {view === 'tech' ? c.code : c.plain}
-                          </div>
+                          <div style={{ fontSize: 13, color: '#93A1BC', marginTop: 3 }}>{view === 'tech' ? c.code : c.plain}</div>
                         </div>
                       </div>
                     ))}
@@ -447,11 +477,9 @@ export default function Dashboard() {
                         <div style={{ fontSize: 13, color: '#5E6C87', fontFamily: "'IBM Plex Mono',monospace", letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 4 }}>
                           Ley de datos personales detectada
                         </div>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: '#EDF1F8' }}>
-                          {dataLaw.law} · {dataLaw.country}
-                        </div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: '#EDF1F8' }}>{dataLaw.law} · {dataLaw.country}</div>
                         <div style={{ fontSize: 13, color: '#93A1BC', marginTop: 4 }}>
-                          Tu dominio <b style={{ color: '#2DD4BF' }}>{domain?.domain}</b> indica que probablemente te aplica esta normativa de protección de datos.
+                          Tu dominio <b style={{ color: '#2DD4BF' }}>{domain?.domain}</b> indica que probablemente te aplica esta normativa.
                         </div>
                       </div>
                     </div>
@@ -510,6 +538,8 @@ const s = {
   scanBtn: { fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: 13, color: '#2DD4BF', background: 'rgba(45,212,191,.1)', border: '1px solid rgba(45,212,191,.3)', padding: '7px 14px', borderRadius: 8, cursor: 'pointer' },
   logoutBtn: { fontFamily: 'Inter,sans-serif', fontSize: 13, color: '#5E6C87', background: 'none', border: '1px solid #25304A', padding: '7px 14px', borderRadius: 8, cursor: 'pointer' },
   main: { padding: '40px 0 64px' },
+  trialBanner: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, background: 'linear-gradient(110deg,rgba(45,212,191,.08),rgba(45,212,191,.03))', border: '1px solid rgba(45,212,191,.25)', borderRadius: 12, padding: '16px 22px', marginBottom: 24, flexWrap: 'wrap' },
+  trialBtn: { fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 14, color: '#06231f', background: '#2DD4BF', border: 'none', padding: '10px 20px', borderRadius: 9, cursor: 'pointer', whiteSpace: 'nowrap' },
   noScan: { textAlign: 'center', padding: '80px 24px', border: '1px solid #1E2840', borderRadius: 20, background: '#131B2C', marginBottom: 28 },
   btnPrimary: { background: '#2DD4BF', color: '#06231f', border: 'none', borderRadius: 10, padding: '13px 28px', fontSize: 15, fontWeight: 700, fontFamily: "'Space Grotesk',sans-serif", cursor: 'pointer' },
   hero: { display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 38, alignItems: 'center', background: 'linear-gradient(180deg,#131B2C,transparent)', border: '1px solid #1E2840', borderRadius: 20, padding: '34px 38px', marginBottom: 28 },

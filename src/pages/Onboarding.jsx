@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
+const SCANNER_URL = import.meta.env.VITE_SCANNER_URL || 'https://scanner.franzthorres.workers.dev'
+
 export default function Onboarding() {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -62,13 +64,37 @@ export default function Onboarding() {
       return
     }
 
-    await supabase.from('domains').insert({
-      org_id: authData.user.id,
-      domain: cleanDomain,
-      verified: false,
-      is_primary: true,
-      monitoring_active: false,
-    })
+    // Crear dominio y obtener el token
+    const { data: domainData } = await supabase
+      .from('domains')
+      .insert({
+        org_id: authData.user.id,
+        domain: cleanDomain,
+        verified: false,
+        is_primary: true,
+        monitoring_active: false,
+      })
+      .select()
+      .single()
+
+    // Mandar mail de verificación via Worker
+    if (domainData) {
+      try {
+        await fetch(`${SCANNER_URL}/send-verification`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: form.email,
+            org_name: form.name,
+            domain: cleanDomain,
+            domain_id: domainData.id,
+            verification_token: domainData.verification_token,
+          })
+        })
+      } catch (e) {
+        console.error('Error mandando mail de verificación:', e)
+      }
+    }
 
     setStep(3)
     setLoading(false)
@@ -174,7 +200,7 @@ export default function Onboarding() {
             </svg>
           </div>
           <h2 style={s.title}>¡Listo, estás dentro!</h2>
-          <p style={s.sub}>Tu cuenta fue creada. Revisá tu mail para verificar el dominio y activar el monitoreo.</p>
+          <p style={s.sub}>Revisá tu mail para verificar el dominio y activar el monitoreo.</p>
           <div style={s.infoBox}>
             <p style={{ fontSize: '13px', color: '#93A1BC', margin: 0 }}>
               Mandamos un mail a <strong style={{ color: '#EDF1F8' }}>{form.email}</strong> con el link de verificación.

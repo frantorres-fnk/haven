@@ -223,17 +223,15 @@ export default function Dashboard() {
       <header style={s.header}>
         <div style={s.wrap}>
           <div style={s.topbar}>
-            <div style={s.brand}>
-              <div style={s.brandMark}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#06231f" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-              </div>
-              <div>
-                <div style={s.brandName}>HAVEN<span style={{ color: '#2DD4BF' }}>.</span></div>
-                <div style={s.brandBy}>by Fenikso</div>
-              </div>
-            </div>
+          <div style={s.brand}>
+  <svg width="30" height="35" viewBox="0 0 120 138" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M50 0 L100 0 Q120 0 120 22 L120 68 Q120 105 60 120 Q0 105 0 68 L0 22 Q0 0 20 0 Z" fill="#2DD4BF"/>
+    <rect x="22" y="28" width="18" height="64" fill="#06231f" rx="3"/>
+    <rect x="80" y="28" width="18" height="64" fill="#06231f" rx="3"/>
+    <rect x="22" y="56" width="76" height="14" fill="#06231f" rx="2"/>
+  </svg>
+  <div style={s.brandName}>HAVEN<span style={{ color: '#2DD4BF' }}>.</span></div>
+</div>
             <div style={s.topRight}>
               {domain && (
                 <div style={s.domainChip}>

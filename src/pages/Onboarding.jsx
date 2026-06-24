@@ -9,19 +9,11 @@ export default function Onboarding() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({
-    name: '',
-    domain: '',
-    email: '',
-    password: '',
-    industry: 'general',
-    plan: 'advanced',
+    name: '', domain: '', email: '', password: '', industry: 'general', plan: 'advanced',
   })
   const navigate = useNavigate()
 
-  function update(k, v) {
-    setForm(f => ({ ...f, [k]: v }))
-    setError('')
-  }
+  function update(k, v) { setForm(f => ({ ...f, [k]: v })); setError('') }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -37,73 +29,56 @@ export default function Onboarding() {
     }
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
+      email: form.email, password: form.password,
     })
-    if (authError) {
-      setError(authError.message)
-      setLoading(false)
-      return
-    }
+    if (authError) { setError(authError.message); setLoading(false); return }
 
     const trialEndsAt = new Date()
     trialEndsAt.setDate(trialEndsAt.getDate() + 7)
 
     const { error: orgError } = await supabase.from('organizations').insert({
-      id: authData.user.id,
-      name: form.name,
-      email: form.email,
-      industry: form.industry,
-      plan: form.plan,
-      status: 'trialing',
+      id: authData.user.id, name: form.name, email: form.email,
+      industry: form.industry, plan: form.plan, status: 'trialing',
       trial_ends_at: trialEndsAt.toISOString(),
     })
-    if (orgError) {
-      setError('Error creando la organización')
-      setLoading(false)
-      return
-    }
+    if (orgError) { setError('Error creando la organización'); setLoading(false); return }
 
-    // Crear dominio y obtener el token
-    const { data: domainData } = await supabase
-      .from('domains')
-      .insert({
-        org_id: authData.user.id,
-        domain: cleanDomain,
-        verified: false,
-        is_primary: true,
-        monitoring_active: false,
-      })
-      .select()
-      .single()
+    const { data: domainData } = await supabase.from('domains').insert({
+      org_id: authData.user.id, domain: cleanDomain,
+      verified: false, is_primary: true, monitoring_active: false,
+    }).select().single()
 
-    // Mandar mail de verificación via Worker
     if (domainData) {
       try {
         await fetch(`${SCANNER_URL}/send-verification`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            email: form.email,
-            org_name: form.name,
-            domain: cleanDomain,
-            domain_id: domainData.id,
-            verification_token: domainData.verification_token,
+            email: form.email, org_name: form.name, domain: cleanDomain,
+            domain_id: domainData.id, verification_token: domainData.verification_token,
           })
         })
-      } catch (e) {
-        console.error('Error mandando mail de verificación:', e)
-      }
+      } catch (e) { console.error('Error mandando mail de verificación:', e) }
     }
 
     setStep(3)
     setLoading(false)
   }
 
+  const LogoMark = () => (
+    <svg width="56" height="65" viewBox="0 0 120 138" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50 0 L100 0 Q120 0 120 22 L120 68 Q120 105 60 120 Q0 105 0 68 L0 22 Q0 0 20 0 Z" fill="#2DD4BF"/>
+      <rect x="22" y="28" width="18" height="64" fill="#06231f" rx="3"/>
+      <rect x="80" y="28" width="18" height="64" fill="#06231f" rx="3"/>
+      <rect x="22" y="56" width="76" height="14" fill="#06231f" rx="2"/>
+    </svg>
+  )
+
   return (
     <div style={s.page}>
       <div style={s.logo}>
-        <h1 style={s.logoText}>HAVEN<span style={s.dot}>.</span></h1>
+        <LogoMark />
+        <h1 style={s.logoText}>HAVEN</h1>
         <p style={s.logoSub}>by Fenikso</p>
       </div>
 
@@ -122,19 +97,16 @@ export default function Onboarding() {
           <p style={s.sub}>Contanos sobre tu negocio para configurar la vigilancia</p>
           <div style={s.field}>
             <label style={s.label}>Nombre de la empresa</label>
-            <input style={s.input} placeholder="Acme S.A." value={form.name}
-              onChange={e => update('name', e.target.value)} />
+            <input style={s.input} placeholder="Acme S.A." value={form.name} onChange={e => update('name', e.target.value)} />
           </div>
           <div style={s.field}>
             <label style={s.label}>Dominio web</label>
-            <input style={s.input} placeholder="miempresa.com.py" value={form.domain}
-              onChange={e => update('domain', e.target.value)} />
+            <input style={s.input} placeholder="miempresa.com.py" value={form.domain} onChange={e => update('domain', e.target.value)} />
             <p style={s.hint}>El dominio que querés proteger</p>
           </div>
           <div style={s.field}>
             <label style={s.label}>Rubro</label>
-            <select style={s.select} value={form.industry}
-              onChange={e => update('industry', e.target.value)}>
+            <select style={s.select} value={form.industry} onChange={e => update('industry', e.target.value)}>
               <option value="fintech">Fintech / Banco</option>
               <option value="ecommerce">E-commerce / Retail</option>
               <option value="health">Salud</option>
@@ -142,9 +114,7 @@ export default function Onboarding() {
               <option value="general">Empresa general</option>
             </select>
           </div>
-          <button style={s.btn}
-            onClick={() => { if (form.name && form.domain) setStep(2); else setError('Completá todos los campos') }}
-          >Continuar →</button>
+          <button style={s.btn} onClick={() => { if (form.name && form.domain) setStep(2); else setError('Completá todos los campos') }}>Continuar →</button>
           {error && <p style={s.error}>{error}</p>}
           <p style={s.register}>¿Ya tenés cuenta? <Link to="/login" style={s.link}>Ingresá</Link></p>
         </div>
@@ -157,14 +127,11 @@ export default function Onboarding() {
           <form onSubmit={handleSubmit}>
             <div style={s.field}>
               <label style={s.label}>Mail corporativo</label>
-              <input style={s.input} type="email"
-                placeholder={`vos@${form.domain || 'tudominio.com'}`}
-                value={form.email} onChange={e => update('email', e.target.value)} required />
+              <input style={s.input} type="email" placeholder={`vos@${form.domain || 'tudominio.com'}`} value={form.email} onChange={e => update('email', e.target.value)} required />
             </div>
             <div style={s.field}>
               <label style={s.label}>Contraseña</label>
-              <input style={s.input} type="password" placeholder="Mínimo 8 caracteres"
-                value={form.password} onChange={e => update('password', e.target.value)} required />
+              <input style={s.input} type="password" placeholder="Mínimo 8 caracteres" value={form.password} onChange={e => update('password', e.target.value)} required />
             </div>
             <div style={s.field}>
               <label style={s.label}>Plan</label>
@@ -206,9 +173,7 @@ export default function Onboarding() {
               Mandamos un mail a <strong style={{ color: '#EDF1F8' }}>{form.email}</strong> con el link de verificación.
             </p>
           </div>
-          <button style={s.btn} onClick={() => navigate('/dashboard')}>
-            Ver mi portal →
-          </button>
+          <button style={s.btn} onClick={() => navigate('/dashboard')}>Ver mi portal →</button>
         </div>
       )}
     </div>
@@ -217,9 +182,8 @@ export default function Onboarding() {
 
 const s = {
   page: { minHeight: '100vh', background: '#0A0F1C', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' },
-  logo: { textAlign: 'center', marginBottom: '24px' },
-  logoText: { fontFamily: "'Space Grotesk', sans-serif", fontSize: '26px', fontWeight: 700, color: '#EDF1F8', letterSpacing: '.04em' },
-  dot: { color: '#2DD4BF' },
+  logo: { textAlign: 'center', marginBottom: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center' },
+  logoText: { fontFamily: "'Space Grotesk', sans-serif", fontSize: '26px', fontWeight: 700, color: '#EDF1F8', letterSpacing: '.06em', marginTop: '8px', marginBottom: 0 },
   logoSub: { fontSize: '11px', color: '#5E6C87', letterSpacing: '.18em', textTransform: 'uppercase', marginTop: '4px' },
   steps: { display: 'flex', alignItems: 'center', marginBottom: '24px' },
   stepWrap: { display: 'flex', alignItems: 'center' },

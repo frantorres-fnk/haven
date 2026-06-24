@@ -1,15 +1,19 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import Login from './pages/Login'
+import Dashboard from './pages/Dashboard'
+import Onboarding from './pages/Onboarding'
+
 function App() {
   return (
-    <div style={{ display: 'grid', placeItems: 'center', minHeight: '100vh' }}>
-      <div style={{ textAlign: 'center' }}>
-        <h1 style={{ fontFamily: 'Space Grotesk, sans-serif', fontSize: '32px', marginBottom: '8px' }}>
-          HAVEN<span style={{ color: '#2DD4BF' }}>.</span>
-        </h1>
-        <p style={{ color: '#5E6C87', fontSize: '14px', letterSpacing: '.18em', textTransform: 'uppercase' }}>
-          by Fenikso · en construcción
-        </p>
-      </div>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/login" />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
+
 export default App

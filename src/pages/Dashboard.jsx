@@ -4,6 +4,85 @@ import { supabase } from '../lib/supabase'
 
 const SCANNER_URL = import.meta.env.VITE_SCANNER_URL || 'https://scanner.franzthorres.workers.dev'
 
+const FRAMEWORKS = {
+  fintech: {
+    badge: 'BCRA · Com. A 7724',
+    sub: 'Lineamientos de ciberseguridad y resiliencia operacional',
+    controls: [
+      { code: 'A7724·4.2', name: 'Detección de fuga de credenciales', plain: 'Vigilar si las contraseñas de la empresa se filtran.', category: 'credentials' },
+      { code: 'A7724·3.5', name: 'Protección de canales digitales', plain: 'Tu web y servicios viajan cifrados.', category: 'tls' },
+      { code: 'A7724·3.6', name: 'Higiene del correo institucional', plain: 'Evitar que imiten el correo de la empresa.', category: 'email_security' },
+      { code: 'A7724·5.1', name: 'Gestión de superficie expuesta', plain: 'Que no queden puertas abiertas a internet.', category: 'osint' },
+      { code: 'A7724·4.4', name: 'Prevención de suplantación de marca', plain: 'Detectar sitios falsos que copian tu marca.', category: 'brand' },
+    ]
+  },
+  ecommerce: {
+    badge: 'PCI DSS v4.0',
+    sub: 'Estándar de seguridad para datos de tarjetas',
+    controls: [
+      { code: 'PCI·Req4', name: 'Cifrado de datos en tránsito', plain: 'Los pagos viajan protegidos.', category: 'tls' },
+      { code: 'PCI·Req2', name: 'Configuraciones seguras', plain: 'Tu sitio no expone configuración de fábrica.', category: 'osint' },
+      { code: 'PCI·Req6', name: 'Sistemas y software seguros', plain: 'Tecnología sin agujeros conocidos.', category: 'technology' },
+      { code: 'PCI·Req8', name: 'Autenticación de accesos', plain: 'Las llaves de acceso no deben estar expuestas.', category: 'credentials' },
+      { code: 'PCI·Req11', name: 'Pruebas de seguridad continuas', plain: 'Se revisa tu exposición todo el tiempo.', category: 'osint' },
+    ]
+  },
+  health: {
+    badge: 'Ley 25.326 · Datos personales',
+    sub: 'Protección de datos personales y sensibles',
+    controls: [
+      { code: '25326·Art9a', name: 'Medidas de seguridad técnicas', plain: 'Los datos viajan cifrados.', category: 'tls' },
+      { code: '25326·Art9b', name: 'Control de acceso a la información', plain: 'Solo quien debe accede a los datos.', category: 'credentials' },
+      { code: '25326·Art9c', name: 'Protección de canales de contacto', plain: 'Que no suplanten el correo con datos de pacientes.', category: 'email_security' },
+      { code: '25326·Art7', name: 'Exposición de datos sensibles', plain: 'Que no queden sistemas con datos abiertos.', category: 'osint' },
+    ]
+  },
+  government: {
+    badge: 'ISO 27001 · NIST CSF',
+    sub: 'Gestión de seguridad de la información',
+    controls: [
+      { code: 'ISO·A.9', name: 'Control de accesos', plain: 'Gestión de quién accede a qué sistemas.', category: 'credentials' },
+      { code: 'ISO·A.10', name: 'Cifrado de información', plain: 'Los datos viajan y se guardan protegidos.', category: 'tls' },
+      { code: 'ISO·A.13', name: 'Seguridad de comunicaciones', plain: 'Las comunicaciones institucionales están protegidas.', category: 'email_security' },
+      { code: 'NIST·PR.IP', name: 'Gestión de superficie expuesta', plain: 'Reducir la exposición pública de sistemas.', category: 'osint' },
+      { code: 'NIST·DE.CM', name: 'Monitoreo continuo', plain: 'Vigilancia permanente de la infraestructura.', category: 'osint' },
+    ]
+  },
+  general: {
+    badge: 'CIS Controls v8',
+    sub: 'Controles críticos de ciberseguridad',
+    controls: [
+      { code: 'CIS·C3', name: 'Protección de datos', plain: 'Los datos de la empresa están protegidos.', category: 'tls' },
+      { code: 'CIS·C5', name: 'Gestión de credenciales', plain: 'Las contraseñas de la empresa son seguras.', category: 'credentials' },
+      { code: 'CIS·C9', name: 'Protección del correo', plain: 'El correo institucional no puede ser suplantado.', category: 'email_security' },
+      { code: 'CIS·C12', name: 'Gestión de superficie', plain: 'Reducir lo que está expuesto a internet.', category: 'osint' },
+    ]
+  },
+}
+
+// Inferir ley de datos personales del TLD
+function getDataLaw(domain) {
+  if (!domain) return null
+  const tld = domain.split('.').slice(-2).join('.').toLowerCase()
+  const map = {
+    'com.py': { law: 'Ley N° 6534/2020', country: 'Paraguay', flag: '🇵🇾' },
+    'com.ar': { law: 'Ley 25.326', country: 'Argentina', flag: '🇦🇷' },
+    'ar': { law: 'Ley 25.326', country: 'Argentina', flag: '🇦🇷' },
+    'com.br': { law: 'LGPD', country: 'Brasil', flag: '🇧🇷' },
+    'br': { law: 'LGPD', country: 'Brasil', flag: '🇧🇷' },
+    'cl': { law: 'Ley 19.628', country: 'Chile', flag: '🇨🇱' },
+    'com.co': { law: 'Ley 1581', country: 'Colombia', flag: '🇨🇴' },
+    'co': { law: 'Ley 1581', country: 'Colombia', flag: '🇨🇴' },
+    'mx': { law: 'LFPDPPP', country: 'México', flag: '🇲🇽' },
+    'com.mx': { law: 'LFPDPPP', country: 'México', flag: '🇲🇽' },
+    'es': { law: 'RGPD / LOPDGDD', country: 'España', flag: '🇪🇸' },
+    'eu': { law: 'GDPR', country: 'Unión Europea', flag: '🇪🇺' },
+    'com.uy': { law: 'Ley 18.331', country: 'Uruguay', flag: '🇺🇾' },
+    'uy': { law: 'Ley 18.331', country: 'Uruguay', flag: '🇺🇾' },
+  }
+  return map[tld] || null
+}
+
 export default function Dashboard() {
   const [org, setOrg] = useState(null)
   const [domain, setDomain] = useState(null)
@@ -109,6 +188,15 @@ export default function Dashboard() {
     </div>
   )
 
+  const framework = FRAMEWORKS[org?.industry] || FRAMEWORKS.general
+  const compControls = framework.controls.map(c => ({
+    ...c, ok: !findings.some(f => f.category === c.category)
+  }))
+  const compHit = compControls.filter(c => c.ok).length
+  const compTot = compControls.length
+  const compPct = Math.round(compHit / compTot * 100)
+  const dataLaw = getDataLaw(domain?.domain)
+
   return (
     <div style={s.page}>
       {/* TOPBAR */}
@@ -149,7 +237,6 @@ export default function Dashboard() {
       <main style={s.main}>
         <div style={s.wrap}>
 
-          {/* NO SCAN YET */}
           {!scan && !scanning && (
             <div style={s.noScan}>
               <div style={{ fontSize: 40, marginBottom: 16 }}>🛡️</div>
@@ -159,7 +246,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* SCANNING */}
           {scanning && (
             <div style={s.noScan}>
               <div style={{ fontSize: 40, marginBottom: 16 }}>🔍</div>
@@ -168,7 +254,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* DASHBOARD CON DATOS REALES */}
           {scan && !scanning && (
             <>
               {/* HERO */}
@@ -187,7 +272,6 @@ export default function Dashboard() {
                     <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 9, color: '#5E6C87', textTransform: 'uppercase', letterSpacing: '.14em', marginTop: 4 }}>Protección</div>
                   </div>
                 </div>
-
                 <div style={s.heroText}>
                   <div style={s.eyebrow}><span style={s.liveDot} />Monitoreo activo · sin interrupción</div>
                   {view === 'owner' ? (
@@ -253,7 +337,6 @@ export default function Dashboard() {
                 <h2 style={s.secTitle}>Alertas activas</h2>
                 <span style={s.secCount}>{findings.length} {findings.length === 1 ? 'abierta' : 'abiertas'}</span>
               </div>
-
               {findings.length === 0 ? (
                 <div style={s.allClear}>
                   <span style={{ fontSize: 24 }}>✅</span>
@@ -278,6 +361,105 @@ export default function Dashboard() {
                 </div>
               )}
 
+              {/* COMPLIANCE PANEL */}
+              <div style={{ marginTop: 32 }}>
+                <div style={s.secHead}>
+                  <h2 style={s.secTitle}>
+                    Postura de cumplimiento
+                    <span style={s.frameBadge}>{framework.badge}</span>
+                  </h2>
+                </div>
+                <div style={s.compCard}>
+                  <div style={s.compTop}>
+                    <div style={{ flex: 1 }}>
+                      <div style={s.compBarLabel}>
+                        <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20 }}>
+                          <b style={{ color: '#2DD4BF' }}>{compHit}</b> de {compTot} controles cubiertos
+                        </span>
+                        <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#5E6C87' }}>
+                          {compTot - compHit} pendiente{compTot - compHit !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <div style={s.compBar}>
+                        <div style={{ ...s.compFill, width: `${compPct}%` }} />
+                      </div>
+                      <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: '#5E6C87', marginTop: 8 }}>
+                        {framework.sub}
+                      </div>
+                    </div>
+                    <div style={s.compRing}>
+                      <svg style={{ transform: 'rotate(-90deg)', width: 80, height: 80 }} viewBox="0 0 80 80">
+                        <circle fill="none" stroke="#25304A" strokeWidth="7" cx="40" cy="40" r="33" />
+                        <circle fill="none" stroke="#2DD4BF" strokeWidth="7" strokeLinecap="round"
+                          cx="40" cy="40" r="33"
+                          strokeDasharray={`${207 * compPct / 100} 207`}
+                          style={{ filter: 'drop-shadow(0 0 5px rgba(45,212,191,.5))' }}
+                        />
+                      </svg>
+                      <div style={s.compRingCenter}>
+                        <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 18, color: '#2DD4BF' }}>{compPct}%</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #1E2840', marginTop: 8 }}>
+                    {compControls.map((c, i) => (
+                      <div key={i} style={s.control}>
+                        <div style={{ ...s.controlMark, ...(c.ok ? s.controlOk : s.controlFail) }}>
+                          {c.ok
+                            ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                          }
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: '#EDF1F8' }}>{c.name}</div>
+                          <div style={{ fontSize: 13, color: '#93A1BC', marginTop: 3 }}>
+                            {view === 'tech' ? c.code : c.plain}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={s.scopeNote}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                    <p style={{ fontSize: 13, color: '#93A1BC', margin: 0, lineHeight: 1.5 }}>
+                      <b style={{ color: '#EDF1F8' }}>Alcance:</b> HAVEN monitorea los controles de superficie externa relevantes para <b style={{ color: '#EDF1F8' }}>{framework.badge}</b>. No constituye una certificación ni cumplimiento integral del marco.
+                    </p>
+                  </div>
+
+                  <div style={s.upsell}>
+                    <p style={{ fontSize: 13, color: '#93A1BC', margin: 0 }}>
+                      ¿Querés cerrar el resto del marco completo? <b style={{ color: '#EDF1F8' }}>Eso lo trabajamos con consultoría y SGSI de Fenikso.</b>
+                    </p>
+                    <a href="mailto:hola@fenikso.io" style={s.upsellBtn}>Hablar con un especialista →</a>
+                  </div>
+                </div>
+              </div>
+
+              {/* LEY DE DATOS PERSONALES */}
+              {dataLaw && (
+                <div style={{ marginTop: 20 }}>
+                  <div style={s.dataLawCard}>
+                    <div style={s.dataLawLeft}>
+                      <span style={{ fontSize: 28 }}>{dataLaw.flag}</span>
+                      <div>
+                        <div style={{ fontSize: 13, color: '#5E6C87', fontFamily: "'IBM Plex Mono',monospace", letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 4 }}>
+                          Ley de datos personales detectada
+                        </div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: '#EDF1F8' }}>
+                          {dataLaw.law} · {dataLaw.country}
+                        </div>
+                        <div style={{ fontSize: 13, color: '#93A1BC', marginTop: 4 }}>
+                          Tu dominio <b style={{ color: '#2DD4BF' }}>{domain?.domain}</b> indica que probablemente te aplica esta normativa de protección de datos.
+                        </div>
+                      </div>
+                    </div>
+                    <a href="mailto:hola@fenikso.io" style={s.upsellBtn}>Ver cobertura completa →</a>
+                  </div>
+                </div>
+              )}
+
               {/* DOMAIN NOT VERIFIED */}
               {domain && !domain.verified && (
                 <div style={s.verifyBanner}>
@@ -296,9 +478,6 @@ export default function Dashboard() {
   )
 }
 
-// ============================================================
-// UTILS
-// ============================================================
 function timeSince(dateStr) {
   if (!dateStr) return '—'
   const seconds = Math.floor((new Date() - new Date(dateStr)) / 1000)
@@ -313,9 +492,6 @@ function daysLeft(dateStr) {
   return Math.max(0, Math.ceil((new Date(dateStr) - new Date()) / 86400000))
 }
 
-// ============================================================
-// STYLES
-// ============================================================
 const s = {
   page: { minHeight: '100vh', background: '#0A0F1C' },
   wrap: { maxWidth: 1080, margin: '0 auto', padding: '0 24px' },
@@ -348,8 +524,8 @@ const s = {
   heroMeta: { display: 'flex', gap: 28, flexWrap: 'wrap' },
   metaK: { fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: '#5E6C87' },
   metaV: { fontSize: 14, color: '#EDF1F8', marginTop: 4, fontWeight: 500 },
-  secHead: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '32px 0 14px' },
-  secTitle: { fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: 15, color: '#EDF1F8' },
+  secHead: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '32px 0 14px', flexWrap: 'wrap', gap: 8 },
+  secTitle: { fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: 15, color: '#EDF1F8', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   secCount: { fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#5E6C87' },
   areas: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 13, marginBottom: 4 },
   areaCard: { background: '#131B2C', border: '1px solid #1E2840', borderRadius: 14, padding: '18px 18px 16px' },
@@ -372,4 +548,21 @@ const s = {
   findingWhen: { fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: '#5E6C87', textAlign: 'right', whiteSpace: 'nowrap' },
   allClear: { display: 'flex', alignItems: 'center', gap: 14, background: '#131B2C', border: '1px solid #1E2840', borderRadius: 13, padding: '22px 24px' },
   verifyBanner: { display: 'flex', alignItems: 'center', gap: 14, background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.2)', borderRadius: 12, padding: '16px 20px', marginTop: 20 },
+  frameBadge: { fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, fontWeight: 500, color: '#2DD4BF', background: 'rgba(45,212,191,.1)', border: '1px solid rgba(45,212,191,.25)', padding: '4px 10px', borderRadius: 7, letterSpacing: '.04em' },
+  compCard: { background: 'linear-gradient(180deg,#131B2C,transparent)', border: '1px solid #1E2840', borderRadius: 18, padding: '28px 30px' },
+  compTop: { display: 'flex', alignItems: 'center', gap: 24, marginBottom: 8 },
+  compBarLabel: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 },
+  compBar: { height: 10, background: '#0A0F1C', borderRadius: 20, overflow: 'hidden', border: '1px solid #25304A' },
+  compFill: { height: '100%', background: 'linear-gradient(90deg,#2DD4BF,#5fe6d6)', borderRadius: 20, transition: 'width .8s ease' },
+  compRing: { position: 'relative', width: 80, height: 80, flexShrink: 0 },
+  compRingCenter: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  control: { display: 'flex', alignItems: 'center', gap: 14, padding: '14px 4px', borderBottom: '1px solid #1E2840' },
+  controlMark: { width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', flexShrink: 0 },
+  controlOk: { background: 'rgba(52,211,153,.13)', color: '#34D399' },
+  controlFail: { background: 'rgba(251,107,107,.13)', color: '#FB6B6B' },
+  scopeNote: { display: 'flex', gap: 12, alignItems: 'flex-start', marginTop: 20, padding: '14px 16px', background: 'rgba(45,212,191,.04)', border: '1px solid rgba(45,212,191,.18)', borderRadius: 10 },
+  upsell: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginTop: 14, padding: '16px 20px', background: '#0A0F1C', border: '1px solid #1E2840', borderRadius: 12, flexWrap: 'wrap' },
+  upsellBtn: { fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: 13, color: '#2DD4BF', background: 'none', border: '1px solid rgba(45,212,191,.4)', padding: '9px 16px', borderRadius: 9, cursor: 'pointer', textDecoration: 'none', whiteSpace: 'nowrap' },
+  dataLawCard: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, background: 'linear-gradient(110deg,#131B2C,#0A0F1C)', border: '1px solid #1E2840', borderRadius: 14, padding: '22px 24px', flexWrap: 'wrap' },
+  dataLawLeft: { display: 'flex', alignItems: 'center', gap: 16, flex: 1 },
 }

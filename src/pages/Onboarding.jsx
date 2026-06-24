@@ -11,7 +11,7 @@ export default function Onboarding() {
     domain: '',
     email: '',
     password: '',
-    industry: 'fintech',
+    industry: 'general',
     plan: 'advanced',
   })
   const navigate = useNavigate()
@@ -26,7 +26,6 @@ export default function Onboarding() {
     setLoading(true)
     setError('')
 
-    // Validar que el mail sea del dominio
     const emailDomain = form.email.split('@')[1]?.toLowerCase()
     const cleanDomain = form.domain.toLowerCase().replace(/^www\./, '')
     if (emailDomain !== cleanDomain) {
@@ -35,7 +34,6 @@ export default function Onboarding() {
       return
     }
 
-    // Crear usuario en Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
@@ -46,11 +44,9 @@ export default function Onboarding() {
       return
     }
 
-    // Calcular trial
     const trialEndsAt = new Date()
     trialEndsAt.setDate(trialEndsAt.getDate() + 7)
 
-    // Crear organización
     const { error: orgError } = await supabase.from('organizations').insert({
       id: authData.user.id,
       name: form.name,
@@ -66,7 +62,6 @@ export default function Onboarding() {
       return
     }
 
-    // Crear dominio
     await supabase.from('domains').insert({
       org_id: authData.user.id,
       domain: cleanDomain,
@@ -86,7 +81,6 @@ export default function Onboarding() {
         <p style={s.logoSub}>by Fenikso</p>
       </div>
 
-      {/* Steps indicator */}
       <div style={s.steps}>
         {[1, 2].map(n => (
           <div key={n} style={s.stepWrap}>
@@ -96,7 +90,6 @@ export default function Onboarding() {
         ))}
       </div>
 
-      {/* STEP 1 */}
       {step === 1 && (
         <div style={s.card}>
           <h2 style={s.title}>Tu empresa</h2>
@@ -119,8 +112,8 @@ export default function Onboarding() {
               <option value="fintech">Fintech / Banco</option>
               <option value="ecommerce">E-commerce / Retail</option>
               <option value="health">Salud</option>
-              <option value="public">Cotiza en bolsa</option>
-              <option value="general">Otro</option>
+              <option value="government">Gobierno / Sector público</option>
+              <option value="general">Empresa general</option>
             </select>
           </div>
           <button style={s.btn}
@@ -131,7 +124,6 @@ export default function Onboarding() {
         </div>
       )}
 
-      {/* STEP 2 */}
       {step === 2 && (
         <div style={s.card}>
           <h2 style={s.title}>Creá tu acceso</h2>
@@ -148,8 +140,6 @@ export default function Onboarding() {
               <input style={s.input} type="password" placeholder="Mínimo 8 caracteres"
                 value={form.password} onChange={e => update('password', e.target.value)} required />
             </div>
-
-            {/* Plan selector */}
             <div style={s.field}>
               <label style={s.label}>Plan</label>
               <div style={s.plans}>
@@ -167,7 +157,6 @@ export default function Onboarding() {
               </div>
               <p style={s.hint}>7 días gratis · cancelás cuando querés</p>
             </div>
-
             {error && <p style={s.error}>{error}</p>}
             <button style={s.btn} type="submit" disabled={loading}>
               {loading ? 'Creando tu cuenta...' : 'Empezar prueba gratis →'}
@@ -177,7 +166,6 @@ export default function Onboarding() {
         </div>
       )}
 
-      {/* STEP 3 — SUCCESS */}
       {step === 3 && (
         <div style={{ ...s.card, textAlign: 'center' }}>
           <div style={s.checkWrap}>

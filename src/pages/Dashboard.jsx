@@ -182,6 +182,8 @@ export default function Dashboard() {
   const stateLabel = hasCritical ? 'Acción inmediata' : hasHigh ? 'Atención requerida' : score >= 90 ? 'Protegido' : 'Atención requerida'
   const stateLabelPlain = hasCritical ? 'Hay problemas críticos que resolver ya' : hasHigh ? 'Vas bien, con tareas pendientes' : 'Tu empresa está protegida'
   const circumference = 402
+  const scoreRating = score >= 90 ? 'A' : score >= 70 ? 'B' : score >= 50 ? 'C' : score >= 30 ? 'D' : 'F'
+  const scoreRatingColor = score >= 90 ? '#34D399' : score >= 70 ? '#2DD4BF' : score >= 50 ? '#FBBF24' : score >= 30 ? '#FB923C' : '#FB6B6B'
   const isTrial = org?.status === 'trialing'
   const trialDaysLeft = daysLeft(org?.trial_ends_at)
 
@@ -239,18 +241,18 @@ export default function Dashboard() {
 
             {/* Role switch */}
             <div style={{ display: 'flex', background: '#131B2C', border: '1px solid #25304A', borderRadius: 10, padding: 3 }}>
-              <button style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: isMobile ? 12 : 13, color: view === 'owner' ? '#06231f' : '#93A1BC', background: view === 'owner' ? '#2DD4BF' : 'none', border: 'none', padding: isMobile ? '6px 10px' : '7px 14px', borderRadius: 8, cursor: 'pointer' }} onClick={() => setView('owner')}>Dueño</button>
+              <button style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: isMobile ? 12 : 13, color: view === 'owner' ? '#06231f' : '#93A1BC', background: view === 'owner' ? '#2DD4BF' : 'none', border: 'none', padding: isMobile ? '6px 10px' : '7px 14px', borderRadius: 8, cursor: 'pointer' }} onClick={() => setView('owner')}>Ejecutivo</button>
               <button style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: isMobile ? 12 : 13, color: view === 'tech' ? '#06231f' : '#93A1BC', background: view === 'tech' ? '#2DD4BF' : 'none', border: 'none', padding: isMobile ? '6px 10px' : '7px 14px', borderRadius: 8, cursor: 'pointer' }} onClick={() => setView('tech')}>Técnico</button>
             </div>
 
             {/* Scan btn */}
             <button style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: isMobile ? 12 : 13, color: '#2DD4BF', background: 'rgba(45,212,191,.1)', border: '1px solid rgba(45,212,191,.3)', padding: isMobile ? '6px 10px' : '7px 14px', borderRadius: 8, cursor: 'pointer' }} onClick={runScan} disabled={scanning}>
-              {scanning ? '⟳' : '⟳ Escanear'}
+              {scanning ? 'Analizando...' : 'Analizar ahora'}
             </button>
 
             {/* Logout — oculto en mobile */}
             {!isMobile && (
-              <button style={{ fontFamily: 'Inter,sans-serif', fontSize: 13, color: '#5E6C87', background: 'none', border: '1px solid #25304A', padding: '7px 14px', borderRadius: 8, cursor: 'pointer' }} onClick={handleLogout}>Salir</button>
+              <button style={{ fontFamily: 'Inter,sans-serif', fontSize: 13, color: '#5E6C87', background: 'none', border: '1px solid #25304A', padding: '7px 14px', borderRadius: 8, cursor: 'pointer' }} onClick={handleLogout}>Cerrar sesión</button>
             )}
           </div>
         </div>
@@ -261,15 +263,22 @@ export default function Dashboard() {
 
           {/* TRIAL BANNER */}
           {isTrial && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: 'linear-gradient(110deg,rgba(45,212,191,.08),rgba(45,212,191,.03))', border: '1px solid rgba(45,212,191,.25)', borderRadius: 12, padding: '14px 18px', marginBottom: 20, flexWrap: 'wrap' }}>
-              <div>
-                <b style={{ color: '#EDF1F8', fontSize: 14 }}>Estás en prueba gratuita</b>
-                <span style={{ color: '#93A1BC', fontSize: 13, marginLeft: 8 }}>
-                  {trialDaysLeft > 0 ? `Te quedan ${trialDaysLeft} días` : 'Tu trial venció hoy'}
-                </span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: trialDaysLeft <= 1 ? 'rgba(251,191,36,.08)' : 'linear-gradient(110deg,rgba(45,212,191,.08),rgba(45,212,191,.03))', border: `1px solid ${trialDaysLeft <= 1 ? 'rgba(251,191,36,.35)' : 'rgba(45,212,191,.25)'}`, borderRadius: 12, padding: '14px 18px', marginBottom: 20, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 16 }}>{trialDaysLeft <= 1 ? '⏱' : '🛡️'}</span>
+                <div>
+                  <b style={{ color: '#EDF1F8', fontSize: 14 }}>Período de prueba activo</b>
+                  <span style={{ color: trialDaysLeft <= 1 ? '#FBBF24' : '#93A1BC', fontSize: 13, marginLeft: 8 }}>
+                    {trialDaysLeft <= 0
+                      ? '· Período vencido · Activá para no perder el monitoreo'
+                      : trialDaysLeft === 1
+                      ? '· Vence mañana · Activá para continuar sin interrupciones'
+                      : `· ${trialDaysLeft} días restantes`}
+                  </span>
+                </div>
               </div>
               <button style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 13, color: '#06231f', background: '#2DD4BF', border: 'none', padding: '10px 16px', borderRadius: 9, cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={handleCheckout} disabled={checkingOut}>
-                {checkingOut ? 'Redirigiendo...' : `Activar · $${org?.plan === 'elite' ? '299' : org?.plan === 'premium' ? '199' : '99'}/mes →`}
+                {checkingOut ? 'Redirigiendo...' : 'Activar suscripción →'}
               </button>
             </div>
           )}
@@ -307,8 +316,13 @@ export default function Dashboard() {
                     />
                   </svg>
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: isMobile ? 26 : 30, color: stateColor, lineHeight: 1 }}>{score}<small style={{ fontSize: 12, color: '#5E6C87' }}>/100</small></div>
-                    <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 9, color: '#5E6C87', textTransform: 'uppercase', letterSpacing: '.14em', marginTop: 4 }}>Protección</div>
+                    <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: isMobile ? 26 : 30, color: stateColor, lineHeight: 1 }}>
+                      {score}<small style={{ fontSize: 13, color: '#5E6C87' }}>/100</small>
+                    </div>
+                    <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 18, color: scoreRatingColor, lineHeight: 1 }}>
+                      {scoreRating}
+                    </div>
+                    <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 9, color: '#5E6C87', textTransform: 'uppercase', letterSpacing: '.14em', marginTop: 2 }}>Protección</div>
                   </div>
                 </div>
 
@@ -375,7 +389,7 @@ export default function Dashboard() {
 
               {/* AREAS */}
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '28px 0 12px' }}>
-                <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: 15, color: '#EDF1F8' }}>Áreas bajo vigilancia</h2>
+                <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: 15, color: '#EDF1F8' }}>Superficie monitoreada</h2>
                 <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#5E6C87' }}>10 · 24/7</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(5,1fr)', gap: 12, marginBottom: 4 }}>
@@ -412,7 +426,7 @@ export default function Dashboard() {
 
               {/* FINDINGS */}
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '28px 0 12px' }}>
-                <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: 15, color: '#EDF1F8' }}>Alertas activas</h2>
+                <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: 15, color: '#EDF1F8' }}>Hallazgos activos</h2>
                 <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#5E6C87' }}>{findings.length} {findings.length === 1 ? 'abierta' : 'abiertas'}</span>
               </div>
               {findings.length === 0 ? (
@@ -443,8 +457,8 @@ export default function Dashboard() {
               {findings.length > 0 && (
                 <div style={{ marginTop: 28 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: 15, color: '#EDF1F8' }}>Top {Math.min(3, findings.length)} acciones recomendadas</h2>
-                    <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#5E6C87' }}>Priorizadas por severidad</span>
+                    <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: 15, color: '#EDF1F8' }}>Plan de acción prioritario</h2>
+                    <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#5E6C87' }}>Ordenado por impacto</span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {[...findings]
@@ -585,7 +599,7 @@ export default function Dashboard() {
 
               {/* LOGOUT MOBILE */}
               {isMobile && (
-                <button style={{ width: '100%', marginTop: 24, fontFamily: 'Inter,sans-serif', fontSize: 13, color: '#5E6C87', background: 'none', border: '1px solid #25304A', padding: '12px', borderRadius: 10, cursor: 'pointer' }} onClick={handleLogout}>Salir</button>
+                <button style={{ width: '100%', marginTop: 24, fontFamily: 'Inter,sans-serif', fontSize: 13, color: '#5E6C87', background: 'none', border: '1px solid #25304A', padding: '12px', borderRadius: 10, cursor: 'pointer' }} onClick={handleLogout}>Cerrar sesión</button>
               )}
             </>
           )}

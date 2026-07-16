@@ -236,6 +236,10 @@ export default function Dashboard() {
               </div>
             )}
 
+            <button onClick={() => navigate('/domains')} style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: isMobile ? 12 : 13, color: '#4F7EFF', background: 'rgba(79,126,255,.1)', border: '1px solid rgba(79,126,255,.3)', padding: isMobile ? '6px 10px' : '7px 14px', borderRadius: 8, cursor: 'pointer' }}>
+              Dominios
+            </button>
+
             {/* Role switch */}
             <div style={{ display: 'flex', background: '#0C1220', border: '1px solid #1A2240', borderRadius: 10, padding: 3 }}>
               <button style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: isMobile ? 12 : 13, color: view === 'owner' ? '#080C18' : '#93A1BC', background: view === 'owner' ? '#4F7EFF' : 'none', border: 'none', padding: isMobile ? '6px 10px' : '7px 14px', borderRadius: 8, cursor: 'pointer' }} onClick={() => setView('owner')}>Ejecutivo</button>

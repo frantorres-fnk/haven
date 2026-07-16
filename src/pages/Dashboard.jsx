@@ -86,6 +86,7 @@ export default function Dashboard() {
   const [org, setOrg] = useState(null)
   const [domain, setDomain] = useState(null)
   const [scan, setScan] = useState(null)
+  const [prevScan, setPrevScan] = useState(null)
   const [findings, setFindings] = useState([])
   const [view, setView] = useState('owner')
   const [loading, setLoading] = useState(true)
@@ -120,10 +121,23 @@ export default function Dashboard() {
   }
 
   async function loadLatestScan(domain_id, org_id) {
-    const { data: scans } = await supabase.from('scans').select('*').eq('domain_id', domain_id).eq('status', 'completed').order('created_at', { ascending: false }).limit(1)
+    const { data: scans } = await supabase
+      .from('scans')
+      .select('*')
+      .eq('domain_id', domain_id)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(2)
+
     if (scans && scans.length > 0) {
       setScan(scans[0])
-      const { data: findingsData } = await supabase.from('findings').select('*').eq('scan_id', scans[0].id).eq('status', 'open').order('severity', { ascending: true })
+      if (scans.length > 1) setPrevScan(scans[1])
+      const { data: findingsData } = await supabase
+        .from('findings')
+        .select('*')
+        .eq('scan_id', scans[0].id)
+        .eq('status', 'open')
+        .order('severity', { ascending: true })
       setFindings(findingsData || [])
     }
   }
@@ -322,6 +336,40 @@ export default function Dashboard() {
                     <div><div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: '#5E6C87' }}>Plan</div><div style={{ fontSize: 13, color: '#EDF1F8', marginTop: 3, fontWeight: 500 }}>{org?.plan?.toUpperCase()}</div></div>
                     <div><div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: '#5E6C87' }}>Trial</div><div style={{ fontSize: 13, color: '#EDF1F8', marginTop: 3, fontWeight: 500 }}><b style={{ color: '#2DD4BF' }}>{trialDaysLeft}d</b> restantes</div></div>
                   </div>
+
+                  {/* TRENDING */}
+                  {prevScan && (
+                    <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {scan.score > prevScan.score ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(52,211,153,.1)', border: '1px solid rgba(52,211,153,.2)', borderRadius: 8, padding: '8px 14px' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34D399" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="18 15 12 9 6 15"/>
+                          </svg>
+                          <span style={{ fontSize: 13, color: '#34D399', fontWeight: 600 }}>
+                            Score mejoró +{scan.score - prevScan.score} puntos vs scan anterior
+                          </span>
+                        </div>
+                      ) : scan.score < prevScan.score ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(251,107,107,.1)', border: '1px solid rgba(251,107,107,.2)', borderRadius: 8, padding: '8px 14px' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FB6B6B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="6 9 12 15 18 9"/>
+                          </svg>
+                          <span style={{ fontSize: 13, color: '#FB6B6B', fontWeight: 600 }}>
+                            Score bajó {prevScan.score - scan.score} puntos vs scan anterior
+                          </span>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(93,109,140,.1)', border: '1px solid rgba(93,109,140,.2)', borderRadius: 8, padding: '8px 14px' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#93A1BC" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                          </svg>
+                          <span style={{ fontSize: 13, color: '#93A1BC', fontWeight: 600 }}>
+                            Score estable vs scan anterior ({prevScan.score}/100)
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </section>
 

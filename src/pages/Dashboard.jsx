@@ -391,6 +391,63 @@ export default function Dashboard() {
                 </div>
               )}
 
+              {/* TOP ACCIONES RECOMENDADAS */}
+              {findings.length > 0 && (
+                <div style={{ marginTop: 28 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: 15, color: '#EDF1F8' }}>Top {Math.min(3, findings.length)} acciones recomendadas</h2>
+                    <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#5E6C87' }}>Priorizadas por severidad</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {[...findings]
+                      .sort((a, b) => {
+                        const order = { critical: 0, high: 1, medium: 2, low: 3 }
+                        return (order[a.severity] ?? 4) - (order[b.severity] ?? 4)
+                      })
+                      .slice(0, 3)
+                      .map((f, i) => (
+                        <div key={i} style={{
+                          display: 'flex', alignItems: 'flex-start', gap: 16,
+                          background: '#131B2C', border: '1px solid #1E2840',
+                          borderRadius: 13, padding: '16px 20px',
+                        }}>
+                          <div style={{
+                            width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                            background: i === 0 ? 'rgba(251,107,107,.15)' : i === 1 ? 'rgba(251,191,36,.13)' : 'rgba(45,212,191,.1)',
+                            color: i === 0 ? '#FB6B6B' : i === 1 ? '#FBBF24' : '#2DD4BF',
+                            display: 'grid', placeItems: 'center',
+                            fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 13,
+                          }}>
+                            {i + 1}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: '#EDF1F8', marginBottom: 4 }}>
+                              {view === 'owner' ? f.title_plain : f.title_tech}
+                            </div>
+                            <div style={{
+                              fontFamily: "'IBM Plex Mono',monospace", fontSize: 12,
+                              color: '#2DD4BF', marginTop: 4,
+                            }}>
+                              → {view === 'owner' ? f.action_plain : f.action_tech}
+                            </div>
+                          </div>
+                          <span style={{
+                            fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, fontWeight: 500,
+                            letterSpacing: '.08em', padding: '4px 8px', borderRadius: 6,
+                            textTransform: 'uppercase', whiteSpace: 'nowrap', alignSelf: 'flex-start',
+                            ...(f.severity === 'critical' || f.severity === 'high'
+                              ? { background: 'rgba(251,107,107,.13)', color: '#FB6B6B' }
+                              : { background: 'rgba(251,191,36,.13)', color: '#FBBF24' })
+                          }}>
+                            {f.severity === 'critical' ? 'Crítico' : f.severity === 'high' ? 'Alto' : 'Medio'}
+                          </span>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+              )}
+
               {/* COMPLIANCE */}
               <div style={{ marginTop: 28 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 0 14px', flexWrap: 'wrap' }}>

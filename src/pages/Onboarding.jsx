@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
@@ -67,10 +67,10 @@ export default function Onboarding() {
 
   const LogoMark = () => (
     <svg width="56" height="65" viewBox="0 0 120 138" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M50 0 L100 0 Q120 0 120 22 L120 68 Q120 105 60 120 Q0 105 0 68 L0 22 Q0 0 20 0 Z" fill="#2DD4BF"/>
-      <rect x="22" y="28" width="18" height="64" fill="#06231f" rx="3"/>
-      <rect x="80" y="28" width="18" height="64" fill="#06231f" rx="3"/>
-      <rect x="22" y="56" width="76" height="14" fill="#06231f" rx="2"/>
+      <path d="M50 0 L100 0 Q120 0 120 22 L120 68 Q120 105 60 120 Q0 105 0 68 L0 22 Q0 0 20 0 Z" fill="#4F7EFF"/>
+      <rect x="22" y="28" width="18" height="64" fill="#080C18" rx="3"/>
+      <rect x="80" y="28" width="18" height="64" fill="#080C18" rx="3"/>
+      <rect x="22" y="56" width="76" height="14" fill="#080C18" rx="2"/>
     </svg>
   )
 
@@ -78,7 +78,7 @@ export default function Onboarding() {
     <div style={s.page}>
       <div style={s.logo}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{ width: 44, height: 3.5, background: '#2DD4BF', borderRadius: 2, marginBottom: 5 }} />
+          <div style={{ width: 44, height: 3.5, background: '#4F7EFF', borderRadius: 2, marginBottom: 5 }} />
           <h1 style={s.logoText}>HAVEN</h1>
         </div>
       </div>
@@ -86,8 +86,8 @@ export default function Onboarding() {
       <div style={s.steps}>
         {[1, 2].map(n => (
           <div key={n} style={s.stepWrap}>
-            <div style={{ ...s.stepDot, background: step >= n ? '#2DD4BF' : '#25304A', color: step >= n ? '#06231f' : '#5E6C87' }}>{n}</div>
-            {n < 2 && <div style={{ ...s.stepLine, background: step > n ? '#2DD4BF' : '#25304A' }} />}
+            <div style={{ ...s.stepDot, background: step >= n ? '#4F7EFF' : '#1A2240', color: step >= n ? '#080C18' : '#5E6C87' }}>{n}</div>
+            {n < 2 && <div style={{ ...s.stepLine, background: step > n ? '#4F7EFF' : '#1A2240' }} />}
           </div>
         ))}
       </div>
@@ -124,7 +124,7 @@ export default function Onboarding() {
       {step === 2 && (
         <div style={s.card}>
           <h2 style={s.title}>Creá tu acceso</h2>
-          <p style={s.sub}>Usá un mail <strong style={{ color: '#2DD4BF' }}>@{form.domain || 'tudominio.com'}</strong> para verificar que sos el dueño</p>
+          <p style={s.sub}>Usá un mail <strong style={{ color: '#4F7EFF' }}>@{form.domain || 'tudominio.com'}</strong> para verificar que sos el dueño</p>
           <form onSubmit={handleSubmit}>
             <div style={s.field}>
               <label style={s.label}>Mail corporativo</label>
@@ -142,9 +142,9 @@ export default function Onboarding() {
                   { key: 'premium', label: 'Premium', price: '$199/mes' },
                   { key: 'elite', label: 'Elite', price: '$299/mes' },
                 ].map(p => (
-                  <div key={p.key} style={{ ...s.planCard, borderColor: form.plan === p.key ? '#2DD4BF' : '#25304A', background: form.plan === p.key ? 'rgba(45,212,191,.06)' : '#0A0F1C' }}
+                  <div key={p.key} style={{ ...s.planCard, borderColor: form.plan === p.key ? '#4F7EFF' : '#1A2240', background: form.plan === p.key ? 'rgba(79,126,255,.06)' : '#080C18' }}
                     onClick={() => update('plan', p.key)}>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: form.plan === p.key ? '#2DD4BF' : '#EDF1F8' }}>{p.label}</div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: form.plan === p.key ? '#4F7EFF' : '#EDF1F8' }}>{p.label}</div>
                     <div style={{ fontSize: '12px', color: '#93A1BC', marginTop: '3px' }}>{p.price}</div>
                   </div>
                 ))}
@@ -163,7 +163,7 @@ export default function Onboarding() {
       {step === 3 && (
         <div style={{ ...s.card, textAlign: 'center' }}>
           <div style={s.checkWrap}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#06231f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#080C18" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12" />
             </svg>
           </div>
@@ -182,7 +182,7 @@ export default function Onboarding() {
 }
 
 const s = {
-  page: { minHeight: '100vh', background: '#0A0F1C', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' },
+  page: { minHeight: '100vh', background: '#080C18', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' },
   logo: { textAlign: 'center', marginBottom: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center' },
   logoText: { fontFamily: "'Space Grotesk', sans-serif", fontSize: '34px', fontWeight: 700, color: '#EDF1F8', letterSpacing: '.08em', margin: 0 },
   logoSub: { fontSize: '11px', color: '#5E6C87', letterSpacing: '.18em', textTransform: 'uppercase', marginTop: '4px' },
@@ -190,21 +190,21 @@ const s = {
   stepWrap: { display: 'flex', alignItems: 'center' },
   stepDot: { width: '28px', height: '28px', borderRadius: '50%', display: 'grid', placeItems: 'center', fontSize: '13px', fontWeight: 700 },
   stepLine: { width: '40px', height: '2px', margin: '0 6px' },
-  card: { background: '#131B2C', border: '1px solid #25304A', borderRadius: '16px', padding: '40px', width: '100%', maxWidth: '440px' },
+  card: { background: '#0C1220', border: '1px solid #1A2240', borderRadius: '16px', padding: '40px', width: '100%', maxWidth: '440px' },
   title: { fontFamily: "'Space Grotesk', sans-serif", fontSize: '22px', fontWeight: 700, color: '#EDF1F8', marginBottom: '8px' },
   sub: { fontSize: '14px', color: '#93A1BC', marginBottom: '28px', lineHeight: 1.5 },
   field: { marginBottom: '18px' },
   label: { display: 'block', fontSize: '13px', color: '#93A1BC', marginBottom: '7px', fontWeight: 500 },
-  input: { width: '100%', background: '#0A0F1C', border: '1px solid #25304A', borderRadius: '9px', padding: '11px 14px', color: '#EDF1F8', fontSize: '14px', outline: 'none', fontFamily: 'Inter, sans-serif' },
-  select: { width: '100%', background: '#0A0F1C', border: '1px solid #25304A', borderRadius: '9px', padding: '11px 14px', color: '#EDF1F8', fontSize: '14px', outline: 'none', fontFamily: 'Inter, sans-serif' },
+  input: { width: '100%', background: '#080C18', border: '1px solid #1A2240', borderRadius: '9px', padding: '11px 14px', color: '#EDF1F8', fontSize: '14px', outline: 'none', fontFamily: 'Inter, sans-serif' },
+  select: { width: '100%', background: '#080C18', border: '1px solid #1A2240', borderRadius: '9px', padding: '11px 14px', color: '#EDF1F8', fontSize: '14px', outline: 'none', fontFamily: 'Inter, sans-serif' },
   hint: { fontSize: '12px', color: '#5E6C87', marginTop: '6px' },
   plans: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px' },
   planCard: { border: '1px solid', borderRadius: '10px', padding: '12px', cursor: 'pointer', transition: '.18s', textAlign: 'center' },
   error: { color: '#FB6B6B', fontSize: '13px', marginBottom: '16px', background: 'rgba(251,107,107,.1)', padding: '10px 14px', borderRadius: '8px' },
-  btn: { width: '100%', background: '#2DD4BF', color: '#06231f', border: 'none', borderRadius: '10px', padding: '13px', fontSize: '15px', fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif", cursor: 'pointer', marginTop: '8px' },
+  btn: { width: '100%', background: '#4F7EFF', color: '#080C18', border: 'none', borderRadius: '10px', padding: '13px', fontSize: '15px', fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif", cursor: 'pointer', marginTop: '8px' },
   back: { background: 'none', border: 'none', color: '#5E6C87', fontSize: '13px', cursor: 'pointer', marginTop: '16px', width: '100%', textAlign: 'center' },
   register: { textAlign: 'center', fontSize: '13px', color: '#5E6C87', marginTop: '24px' },
-  link: { color: '#2DD4BF', textDecoration: 'none', fontWeight: 500 },
-  checkWrap: { width: '56px', height: '56px', borderRadius: '50%', background: '#2DD4BF', display: 'grid', placeItems: 'center', margin: '0 auto 20px' },
-  infoBox: { background: '#0A0F1C', border: '1px solid #25304A', borderRadius: '10px', padding: '16px', margin: '20px 0' },
+  link: { color: '#4F7EFF', textDecoration: 'none', fontWeight: 500 },
+  checkWrap: { width: '56px', height: '56px', borderRadius: '50%', background: '#4F7EFF', display: 'grid', placeItems: 'center', margin: '0 auto 20px' },
+  infoBox: { background: '#080C18', border: '1px solid #1A2240', borderRadius: '10px', padding: '16px', margin: '20px 0' },
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
@@ -183,7 +183,7 @@ export default function Dashboard() {
   const stateLabelPlain = hasCritical ? 'Hay problemas críticos que resolver ya' : hasHigh ? 'Vas bien, con tareas pendientes' : 'Tu empresa está protegida'
   const circumference = 402
   const scoreRating = score >= 90 ? 'A' : score >= 70 ? 'B' : score >= 50 ? 'C' : score >= 30 ? 'D' : 'F'
-  const scoreRatingColor = score >= 90 ? '#34D399' : score >= 70 ? '#2DD4BF' : score >= 50 ? '#FBBF24' : score >= 30 ? '#FB923C' : '#FB6B6B'
+  const scoreRatingColor = score >= 90 ? '#34D399' : score >= 70 ? '#4F7EFF' : score >= 50 ? '#FBBF24' : score >= 30 ? '#FB923C' : '#FB6B6B'
   const isTrial = org?.status === 'trialing'
   const trialDaysLeft = daysLeft(org?.trial_ends_at)
 
@@ -195,9 +195,9 @@ export default function Dashboard() {
   }
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: '#0A0F1C', display: 'grid', placeItems: 'center' }}>
+    <div style={{ minHeight: '100vh', background: '#080C18', display: 'grid', placeItems: 'center' }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: '24px', color: '#2DD4BF', marginBottom: '12px' }}>HAVEN<span style={{ color: '#2DD4BF' }}>.</span></div>
+        <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: '24px', color: '#4F7EFF', marginBottom: '12px' }}>HAVEN<span style={{ color: '#4F7EFF' }}>.</span></div>
         <p style={{ color: '#5E6C87', fontSize: '14px' }}>Cargando tu portal...</p>
       </div>
     </div>
@@ -211,15 +211,15 @@ export default function Dashboard() {
   const dataLaw = getDataLaw(domain?.domain)
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0A0F1C' }}>
+    <div style={{ minHeight: '100vh', background: '#080C18' }}>
 
       {/* TOPBAR */}
-      <header style={{ borderBottom: '1px solid #1E2840', position: 'sticky', top: 0, zIndex: 20, background: 'rgba(10,15,28,.85)', backdropFilter: 'blur(14px)' }}>
+      <header style={{ borderBottom: '1px solid #1A2240', position: 'sticky', top: 0, zIndex: 20, background: 'rgba(10,15,28,.85)', backdropFilter: 'blur(14px)' }}>
         <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, gap: 10 }}>
           {/* BRAND */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-              <div style={{ width: 28, height: 3, background: '#2DD4BF', borderRadius: 2, marginBottom: 3 }} />
+              <div style={{ width: 28, height: 3, background: '#4F7EFF', borderRadius: 2, marginBottom: 3 }} />
               <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20, letterSpacing: '0.08em', color: '#EDF1F8', lineHeight: 1 }}>
                 HAVEN
               </div>
@@ -230,26 +230,26 @@ export default function Dashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {/* Domain chip — oculto en mobile */}
             {!isMobile && domain && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: '#93A1BC', padding: '7px 13px', border: '1px solid #25304A', borderRadius: 8, background: '#131B2C' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: '#93A1BC', padding: '7px 13px', border: '1px solid #1A2240', borderRadius: 8, background: '#0C1220' }}>
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#34D399', boxShadow: '0 0 8px #34D399', display: 'inline-block' }} />
                 {domain.domain}
               </div>
             )}
 
             {/* Role switch */}
-            <div style={{ display: 'flex', background: '#131B2C', border: '1px solid #25304A', borderRadius: 10, padding: 3 }}>
-              <button style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: isMobile ? 12 : 13, color: view === 'owner' ? '#06231f' : '#93A1BC', background: view === 'owner' ? '#2DD4BF' : 'none', border: 'none', padding: isMobile ? '6px 10px' : '7px 14px', borderRadius: 8, cursor: 'pointer' }} onClick={() => setView('owner')}>Ejecutivo</button>
-              <button style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: isMobile ? 12 : 13, color: view === 'tech' ? '#06231f' : '#93A1BC', background: view === 'tech' ? '#2DD4BF' : 'none', border: 'none', padding: isMobile ? '6px 10px' : '7px 14px', borderRadius: 8, cursor: 'pointer' }} onClick={() => setView('tech')}>Técnico</button>
+            <div style={{ display: 'flex', background: '#0C1220', border: '1px solid #1A2240', borderRadius: 10, padding: 3 }}>
+              <button style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: isMobile ? 12 : 13, color: view === 'owner' ? '#080C18' : '#93A1BC', background: view === 'owner' ? '#4F7EFF' : 'none', border: 'none', padding: isMobile ? '6px 10px' : '7px 14px', borderRadius: 8, cursor: 'pointer' }} onClick={() => setView('owner')}>Ejecutivo</button>
+              <button style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: isMobile ? 12 : 13, color: view === 'tech' ? '#080C18' : '#93A1BC', background: view === 'tech' ? '#4F7EFF' : 'none', border: 'none', padding: isMobile ? '6px 10px' : '7px 14px', borderRadius: 8, cursor: 'pointer' }} onClick={() => setView('tech')}>Técnico</button>
             </div>
 
             {/* Scan btn */}
-            <button style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: isMobile ? 12 : 13, color: '#2DD4BF', background: 'rgba(45,212,191,.1)', border: '1px solid rgba(45,212,191,.3)', padding: isMobile ? '6px 10px' : '7px 14px', borderRadius: 8, cursor: 'pointer' }} onClick={runScan} disabled={scanning}>
+            <button style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: isMobile ? 12 : 13, color: '#4F7EFF', background: 'rgba(79,126,255,.1)', border: '1px solid rgba(79,126,255,.3)', padding: isMobile ? '6px 10px' : '7px 14px', borderRadius: 8, cursor: 'pointer' }} onClick={runScan} disabled={scanning}>
               {scanning ? 'Analizando...' : 'Analizar ahora'}
             </button>
 
             {/* Logout — oculto en mobile */}
             {!isMobile && (
-              <button style={{ fontFamily: 'Inter,sans-serif', fontSize: 13, color: '#5E6C87', background: 'none', border: '1px solid #25304A', padding: '7px 14px', borderRadius: 8, cursor: 'pointer' }} onClick={handleLogout}>Cerrar sesión</button>
+              <button style={{ fontFamily: 'Inter,sans-serif', fontSize: 13, color: '#5E6C87', background: 'none', border: '1px solid #1A2240', padding: '7px 14px', borderRadius: 8, cursor: 'pointer' }} onClick={handleLogout}>Cerrar sesión</button>
             )}
           </div>
         </div>
@@ -260,7 +260,7 @@ export default function Dashboard() {
 
           {/* TRIAL BANNER */}
           {isTrial && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: trialDaysLeft <= 1 ? 'rgba(251,191,36,.08)' : 'linear-gradient(110deg,rgba(45,212,191,.08),rgba(45,212,191,.03))', border: `1px solid ${trialDaysLeft <= 1 ? 'rgba(251,191,36,.35)' : 'rgba(45,212,191,.25)'}`, borderRadius: 12, padding: '14px 18px', marginBottom: 20, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: trialDaysLeft <= 1 ? 'rgba(251,191,36,.08)' : 'linear-gradient(110deg,rgba(79,126,255,.08),rgba(79,126,255,.03))', border: `1px solid ${trialDaysLeft <= 1 ? 'rgba(251,191,36,.35)' : 'rgba(79,126,255,.25)'}`, borderRadius: 12, padding: '14px 18px', marginBottom: 20, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 16 }}>{trialDaysLeft <= 1 ? '⏱' : '🛡️'}</span>
                 <div>
@@ -274,7 +274,7 @@ export default function Dashboard() {
                   </span>
                 </div>
               </div>
-              <button style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 13, color: '#06231f', background: '#2DD4BF', border: 'none', padding: '10px 16px', borderRadius: 9, cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={handleCheckout} disabled={checkingOut}>
+              <button style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 13, color: '#080C18', background: '#4F7EFF', border: 'none', padding: '10px 16px', borderRadius: 9, cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={handleCheckout} disabled={checkingOut}>
                 {checkingOut ? 'Redirigiendo...' : 'Activar suscripción →'}
               </button>
             </div>
@@ -282,19 +282,19 @@ export default function Dashboard() {
 
           {/* NO SCAN */}
           {!scan && !scanning && (
-            <div style={{ textAlign: 'center', padding: '60px 24px', border: '1px solid #1E2840', borderRadius: 20, background: '#131B2C', marginBottom: 24 }}>
+            <div style={{ textAlign: 'center', padding: '60px 24px', border: '1px solid #1A2240', borderRadius: 20, background: '#0C1220', marginBottom: 24 }}>
               <div style={{ fontSize: 40, marginBottom: 16 }}>🛡️</div>
               <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, marginBottom: 8, color: '#EDF1F8' }}>Tu dominio está listo para ser analizado</h2>
               <p style={{ color: '#93A1BC', fontSize: 14, marginBottom: 24 }}>Corré el primer scan para ver el estado real de tu empresa.</p>
-              <button style={{ background: '#2DD4BF', color: '#06231f', border: 'none', borderRadius: 10, padding: '13px 28px', fontSize: 15, fontWeight: 700, fontFamily: "'Space Grotesk',sans-serif", cursor: 'pointer' }} onClick={runScan}>Iniciar primer scan →</button>
+              <button style={{ background: '#4F7EFF', color: '#080C18', border: 'none', borderRadius: 10, padding: '13px 28px', fontSize: 15, fontWeight: 700, fontFamily: "'Space Grotesk',sans-serif", cursor: 'pointer' }} onClick={runScan}>Iniciar primer scan →</button>
             </div>
           )}
 
           {/* SCANNING */}
           {scanning && (
-            <div style={{ textAlign: 'center', padding: '60px 24px', border: '1px solid #1E2840', borderRadius: 20, background: '#131B2C', marginBottom: 24 }}>
+            <div style={{ textAlign: 'center', padding: '60px 24px', border: '1px solid #1A2240', borderRadius: 20, background: '#0C1220', marginBottom: 24 }}>
               <div style={{ fontSize: 40, marginBottom: 16 }}>🔍</div>
-              <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, marginBottom: 8, color: '#2DD4BF' }}>Analizando {domain?.domain}...</h2>
+              <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, marginBottom: 8, color: '#4F7EFF' }}>Analizando {domain?.domain}...</h2>
               <p style={{ color: '#93A1BC', fontSize: 14 }}>Chequeando SPF, DMARC, TLS y exposición. Un momento.</p>
             </div>
           )}
@@ -303,10 +303,10 @@ export default function Dashboard() {
           {scan && !scanning && (
             <>
               {/* HERO */}
-              <section style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'auto 1fr', gap: isMobile ? 20 : 38, alignItems: 'center', background: 'linear-gradient(180deg,#131B2C,transparent)', border: '1px solid #1E2840', borderRadius: 20, padding: isMobile ? '24px 20px' : '34px 38px', marginBottom: 24, textAlign: isMobile ? 'center' : 'left' }}>
+              <section style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'auto 1fr', gap: isMobile ? 20 : 38, alignItems: 'center', background: 'linear-gradient(180deg,#0C1220,transparent)', border: '1px solid #1A2240', borderRadius: 20, padding: isMobile ? '24px 20px' : '34px 38px', marginBottom: 24, textAlign: isMobile ? 'center' : 'left' }}>
                 <div style={{ position: 'relative', width: isMobile ? 120 : 150, height: isMobile ? 120 : 150, margin: isMobile ? '0 auto' : 0, flexShrink: 0 }}>
                   <svg style={{ transform: 'rotate(-90deg)', width: '100%', height: '100%' }} viewBox="0 0 150 150">
-                    <circle fill="none" stroke="#25304A" strokeWidth="9" cx="75" cy="75" r="64" />
+                    <circle fill="none" stroke="#1A2240" strokeWidth="9" cx="75" cy="75" r="64" />
                     <circle fill="none" stroke={stateColor} strokeWidth="9" strokeLinecap="round" cx="75" cy="75" r="64"
                       strokeDasharray={`${circumference * score / 100} ${circumference}`}
                       style={{ filter: `drop-shadow(0 0 6px ${stateColor})` }}
@@ -325,7 +325,7 @@ export default function Dashboard() {
 
                 <div>
                   <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: '#5E6C87', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, justifyContent: isMobile ? 'center' : 'flex-start' }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2DD4BF', display: 'inline-block' }} />
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4F7EFF', display: 'inline-block' }} />
                     Monitoreo activo
                   </div>
                   {view === 'owner' ? (
@@ -342,10 +342,10 @@ export default function Dashboard() {
                     </>
                   )}
                   <div style={{ display: 'flex', gap: isMobile ? 16 : 28, flexWrap: 'wrap', justifyContent: isMobile ? 'center' : 'flex-start' }}>
-                    <div><div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: '#5E6C87' }}>Último scan</div><div style={{ fontSize: 13, color: '#EDF1F8', marginTop: 3, fontWeight: 500 }}>hace <b style={{ color: '#2DD4BF' }}>{timeSince(scan.completed_at)}</b></div></div>
+                    <div><div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: '#5E6C87' }}>Último scan</div><div style={{ fontSize: 13, color: '#EDF1F8', marginTop: 3, fontWeight: 500 }}>hace <b style={{ color: '#4F7EFF' }}>{timeSince(scan.completed_at)}</b></div></div>
                     <div><div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: '#5E6C87' }}>Hallazgos</div><div style={{ fontSize: 13, color: '#EDF1F8', marginTop: 3, fontWeight: 500 }}><b style={{ color: stateColor }}>{findings.length}</b> abiertos</div></div>
                     <div><div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: '#5E6C87' }}>Plan</div><div style={{ fontSize: 13, color: '#EDF1F8', marginTop: 3, fontWeight: 500 }}>{org?.plan?.toUpperCase()}</div></div>
-                    <div><div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: '#5E6C87' }}>Trial</div><div style={{ fontSize: 13, color: '#EDF1F8', marginTop: 3, fontWeight: 500 }}><b style={{ color: '#2DD4BF' }}>{trialDaysLeft}d</b> restantes</div></div>
+                    <div><div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: '#5E6C87' }}>Trial</div><div style={{ fontSize: 13, color: '#EDF1F8', marginTop: 3, fontWeight: 500 }}><b style={{ color: '#4F7EFF' }}>{trialDaysLeft}d</b> restantes</div></div>
                   </div>
 
                   {/* TRENDING */}
@@ -405,7 +405,7 @@ export default function Dashboard() {
                   const status = areaStatus(a.category)
                   const areaFindings = findings.filter(f => f.category === a.category)
                   return (
-                    <div key={i} style={{ background: '#131B2C', border: '1px solid #1E2840', borderRadius: 14, padding: '16px 14px' }}>
+                    <div key={i} style={{ background: '#0C1220', border: '1px solid #1A2240', borderRadius: 14, padding: '16px 14px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                         <span style={{ fontSize: 18 }}>{a.icon}</span>
                         <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, fontWeight: 500, letterSpacing: '.06em', padding: '4px 8px', borderRadius: 20, textTransform: 'uppercase', ...(status === 'ok' ? { background: 'rgba(52,211,153,.12)', color: '#34D399' } : status === 'warn' ? { background: 'rgba(251,191,36,.13)', color: '#FBBF24' } : { background: 'rgba(251,107,107,.13)', color: '#FB6B6B' }) }}>
@@ -427,14 +427,14 @@ export default function Dashboard() {
                 <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#5E6C87' }}>{findings.length} {findings.length === 1 ? 'abierta' : 'abiertas'}</span>
               </div>
               {findings.length === 0 ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#131B2C', border: '1px solid #1E2840', borderRadius: 13, padding: '20px 20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#0C1220', border: '1px solid #1A2240', borderRadius: 13, padding: '20px 20px' }}>
                   <span style={{ fontSize: 24 }}>✅</span>
                   <p style={{ color: '#93A1BC', fontSize: 14, margin: 0 }}>Sin alertas. Tu superficie está limpia.</p>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {findings.map((f, i) => (
-                    <div key={i} style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 16, alignItems: isMobile ? 'flex-start' : 'start', background: '#131B2C', border: '1px solid #1E2840', borderLeft: `3px solid ${f.severity === 'critical' || f.severity === 'high' ? '#FB6B6B' : '#FBBF24'}`, borderRadius: 13, padding: '14px 16px' }}>
+                    <div key={i} style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 16, alignItems: isMobile ? 'flex-start' : 'start', background: '#0C1220', border: '1px solid #1A2240', borderLeft: `3px solid ${f.severity === 'critical' || f.severity === 'high' ? '#FB6B6B' : '#FBBF24'}`, borderRadius: 13, padding: '14px 16px' }}>
                       <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, fontWeight: 500, letterSpacing: '.1em', padding: '5px 9px', borderRadius: 6, textTransform: 'uppercase', whiteSpace: 'nowrap', ...(f.severity === 'critical' || f.severity === 'high' ? { background: 'rgba(251,107,107,.13)', color: '#FB6B6B' } : { background: 'rgba(251,191,36,.13)', color: '#FBBF24' }) }}>
                         {f.severity === 'critical' ? 'Crítico' : f.severity === 'high' ? 'Alto' : 'Medio'}
                       </span>
@@ -442,7 +442,7 @@ export default function Dashboard() {
                         <div style={{ fontSize: 14, fontWeight: 600, color: '#EDF1F8', marginBottom: 4 }}>{view === 'owner' ? f.title_plain : f.title_tech}</div>
                         <div style={{ fontSize: 13, color: '#93A1BC', lineHeight: 1.5 }}>{view === 'owner' ? f.description_plain : f.description_tech}</div>
                         <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#5E6C87', marginTop: 6 }}>→ {view === 'owner' ? f.action_plain : f.action_tech}</div>
-                        {view === 'tech' && f.reference && <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#2DD4BF', marginTop: 4 }}>{f.reference}</div>}
+                        {view === 'tech' && f.reference && <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#4F7EFF', marginTop: 4 }}>{f.reference}</div>}
                       </div>
                       {!isMobile && <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: '#5E6C87', textAlign: 'right', whiteSpace: 'nowrap' }}>{timeSince(f.first_seen_at)}</div>}
                     </div>
@@ -467,13 +467,13 @@ export default function Dashboard() {
                       .map((f, i) => (
                         <div key={i} style={{
                           display: 'flex', alignItems: 'flex-start', gap: 16,
-                          background: '#131B2C', border: '1px solid #1E2840',
+                          background: '#0C1220', border: '1px solid #1A2240',
                           borderRadius: 13, padding: '16px 20px',
                         }}>
                           <div style={{
                             width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                            background: i === 0 ? 'rgba(251,107,107,.15)' : i === 1 ? 'rgba(251,191,36,.13)' : 'rgba(45,212,191,.1)',
-                            color: i === 0 ? '#FB6B6B' : i === 1 ? '#FBBF24' : '#2DD4BF',
+                            background: i === 0 ? 'rgba(251,107,107,.15)' : i === 1 ? 'rgba(251,191,36,.13)' : 'rgba(79,126,255,.1)',
+                            color: i === 0 ? '#FB6B6B' : i === 1 ? '#FBBF24' : '#4F7EFF',
                             display: 'grid', placeItems: 'center',
                             fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 13,
                           }}>
@@ -485,7 +485,7 @@ export default function Dashboard() {
                             </div>
                             <div style={{
                               fontFamily: "'IBM Plex Mono',monospace", fontSize: 12,
-                              color: '#2DD4BF', marginTop: 4,
+                              color: '#4F7EFF', marginTop: 4,
                             }}>
                               → {view === 'owner' ? f.action_plain : f.action_tech}
                             </div>
@@ -511,36 +511,36 @@ export default function Dashboard() {
               <div style={{ marginTop: 28 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 0 14px', flexWrap: 'wrap' }}>
                   <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: 15, color: '#EDF1F8' }}>Postura de cumplimiento</h2>
-                  <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: '#2DD4BF', background: 'rgba(45,212,191,.1)', border: '1px solid rgba(45,212,191,.25)', padding: '4px 10px', borderRadius: 7 }}>{framework.badge}</span>
+                  <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: '#4F7EFF', background: 'rgba(79,126,255,.1)', border: '1px solid rgba(79,126,255,.25)', padding: '4px 10px', borderRadius: 7 }}>{framework.badge}</span>
                 </div>
-                <div style={{ background: 'linear-gradient(180deg,#131B2C,transparent)', border: '1px solid #1E2840', borderRadius: 18, padding: isMobile ? '20px 16px' : '28px 30px' }}>
+                <div style={{ background: 'linear-gradient(180deg,#0C1220,transparent)', border: '1px solid #1A2240', borderRadius: 18, padding: isMobile ? '20px 16px' : '28px 30px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 8, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                     <div style={{ flex: 1, minWidth: 200 }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
                         <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: isMobile ? 16 : 20 }}>
-                          <b style={{ color: '#2DD4BF' }}>{compHit}</b> de {compTot} controles cubiertos
+                          <b style={{ color: '#4F7EFF' }}>{compHit}</b> de {compTot} controles cubiertos
                         </span>
                         <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#5E6C87' }}>{compTot - compHit} pendiente{compTot - compHit !== 1 ? 's' : ''}</span>
                       </div>
-                      <div style={{ height: 10, background: '#0A0F1C', borderRadius: 20, overflow: 'hidden', border: '1px solid #25304A' }}>
-                        <div style={{ height: '100%', background: 'linear-gradient(90deg,#2DD4BF,#5fe6d6)', borderRadius: 20, width: `${compPct}%` }} />
+                      <div style={{ height: 10, background: '#080C18', borderRadius: 20, overflow: 'hidden', border: '1px solid #1A2240' }}>
+                        <div style={{ height: '100%', background: 'linear-gradient(90deg,#4F7EFF,#5fe6d6)', borderRadius: 20, width: `${compPct}%` }} />
                       </div>
                       <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: '#5E6C87', marginTop: 8 }}>{framework.sub}</div>
                     </div>
                     <div style={{ position: 'relative', width: 72, height: 72, flexShrink: 0 }}>
                       <svg style={{ transform: 'rotate(-90deg)', width: 72, height: 72 }} viewBox="0 0 80 80">
-                        <circle fill="none" stroke="#25304A" strokeWidth="7" cx="40" cy="40" r="33" />
-                        <circle fill="none" stroke="#2DD4BF" strokeWidth="7" strokeLinecap="round" cx="40" cy="40" r="33" strokeDasharray={`${207 * compPct / 100} 207`} style={{ filter: 'drop-shadow(0 0 5px rgba(45,212,191,.5))' }} />
+                        <circle fill="none" stroke="#1A2240" strokeWidth="7" cx="40" cy="40" r="33" />
+                        <circle fill="none" stroke="#4F7EFF" strokeWidth="7" strokeLinecap="round" cx="40" cy="40" r="33" strokeDasharray={`${207 * compPct / 100} 207`} style={{ filter: 'drop-shadow(0 0 5px rgba(79,126,255,.5))' }} />
                       </svg>
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 16, color: '#2DD4BF' }}>{compPct}%</div>
+                        <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 16, color: '#4F7EFF' }}>{compPct}%</div>
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ borderTop: '1px solid #1E2840', marginTop: 8 }}>
+                  <div style={{ borderTop: '1px solid #1A2240', marginTop: 8 }}>
                     {compControls.map((c, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 4px', borderBottom: '1px solid #1E2840' }}>
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 4px', borderBottom: '1px solid #1A2240' }}>
                         <div style={{ width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', flexShrink: 0, ...(c.ok ? { background: 'rgba(52,211,153,.13)', color: '#34D399' } : { background: 'rgba(251,107,107,.13)', color: '#FB6B6B' }) }}>
                           {c.ok
                             ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -555,32 +555,32 @@ export default function Dashboard() {
                     ))}
                   </div>
 
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginTop: 18, padding: '14px 16px', background: 'rgba(45,212,191,.04)', border: '1px solid rgba(45,212,191,.18)', borderRadius: 10 }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2DD4BF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginTop: 18, padding: '14px 16px', background: 'rgba(79,126,255,.04)', border: '1px solid rgba(79,126,255,.18)', borderRadius: 10 }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4F7EFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
                     <p style={{ fontSize: 12, color: '#93A1BC', margin: 0, lineHeight: 1.5 }}>
                       <b style={{ color: '#EDF1F8' }}>Alcance:</b> HAVEN monitorea los controles de superficie externa relevantes para <b style={{ color: '#EDF1F8' }}>{framework.badge}</b>. No constituye una certificación ni cumplimiento integral del marco.
                     </p>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, marginTop: 12, padding: '14px 18px', background: '#0A0F1C', border: '1px solid #1E2840', borderRadius: 12, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, marginTop: 12, padding: '14px 18px', background: '#080C18', border: '1px solid #1A2240', borderRadius: 12, flexWrap: 'wrap' }}>
                     <p style={{ fontSize: 13, color: '#93A1BC', margin: 0 }}>¿Querés cerrar el marco completo? <b style={{ color: '#EDF1F8' }}>Consultoría y SGSI de Fenikso.</b></p>
-                    <a href="mailto:hola@fenikso.io" style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: 13, color: '#2DD4BF', background: 'none', border: '1px solid rgba(45,212,191,.4)', padding: '9px 16px', borderRadius: 9, cursor: 'pointer', textDecoration: 'none', whiteSpace: 'nowrap' }}>Hablar con un especialista →</a>
+                    <a href="mailto:hola@fenikso.io" style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: 13, color: '#4F7EFF', background: 'none', border: '1px solid rgba(79,126,255,.4)', padding: '9px 16px', borderRadius: 9, cursor: 'pointer', textDecoration: 'none', whiteSpace: 'nowrap' }}>Hablar con un especialista →</a>
                   </div>
                 </div>
               </div>
 
               {/* DATA LAW */}
               {dataLaw && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, background: 'linear-gradient(110deg,#131B2C,#0A0F1C)', border: '1px solid #1E2840', borderRadius: 14, padding: '18px 20px', marginTop: 16, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, background: 'linear-gradient(110deg,#0C1220,#080C18)', border: '1px solid #1A2240', borderRadius: 14, padding: '18px 20px', marginTop: 16, flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1 }}>
                     <span style={{ fontSize: 26 }}>{dataLaw.flag}</span>
                     <div>
                       <div style={{ fontSize: 11, color: '#5E6C87', fontFamily: "'IBM Plex Mono',monospace", letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 3 }}>Ley de datos detectada</div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: '#EDF1F8' }}>{dataLaw.law} · {dataLaw.country}</div>
-                      <div style={{ fontSize: 12, color: '#93A1BC', marginTop: 3 }}>Dominio <b style={{ color: '#2DD4BF' }}>{domain?.domain}</b></div>
+                      <div style={{ fontSize: 12, color: '#93A1BC', marginTop: 3 }}>Dominio <b style={{ color: '#4F7EFF' }}>{domain?.domain}</b></div>
                     </div>
                   </div>
-                  <a href="mailto:hola@fenikso.io" style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: 13, color: '#2DD4BF', background: 'none', border: '1px solid rgba(45,212,191,.4)', padding: '9px 16px', borderRadius: 9, cursor: 'pointer', textDecoration: 'none', whiteSpace: 'nowrap' }}>Ver cobertura →</a>
+                  <a href="mailto:hola@fenikso.io" style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: 13, color: '#4F7EFF', background: 'none', border: '1px solid rgba(79,126,255,.4)', padding: '9px 16px', borderRadius: 9, cursor: 'pointer', textDecoration: 'none', whiteSpace: 'nowrap' }}>Ver cobertura →</a>
                 </div>
               )}
 
@@ -589,14 +589,14 @@ export default function Dashboard() {
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.2)', borderRadius: 12, padding: '14px 18px', marginTop: 16 }}>
                   <span>⚠️</span>
                   <p style={{ fontSize: 13, color: '#93A1BC', margin: 0, lineHeight: 1.5 }}>
-                    <b style={{ color: '#EDF1F8' }}>Verificá tu dominio</b> para activar el monitoreo. Revisá tu mail en <b style={{ color: '#2DD4BF' }}>{org?.email}</b>.
+                    <b style={{ color: '#EDF1F8' }}>Verificá tu dominio</b> para activar el monitoreo. Revisá tu mail en <b style={{ color: '#4F7EFF' }}>{org?.email}</b>.
                   </p>
                 </div>
               )}
 
               {/* LOGOUT MOBILE */}
               {isMobile && (
-                <button style={{ width: '100%', marginTop: 24, fontFamily: 'Inter,sans-serif', fontSize: 13, color: '#5E6C87', background: 'none', border: '1px solid #25304A', padding: '12px', borderRadius: 10, cursor: 'pointer' }} onClick={handleLogout}>Cerrar sesión</button>
+                <button style={{ width: '100%', marginTop: 24, fontFamily: 'Inter,sans-serif', fontSize: 13, color: '#5E6C87', background: 'none', border: '1px solid #1A2240', padding: '12px', borderRadius: 10, cursor: 'pointer' }} onClick={handleLogout}>Cerrar sesión</button>
               )}
             </>
           )}

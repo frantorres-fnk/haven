@@ -330,12 +330,14 @@ export default function Dashboard() {
                 <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: 15, color: '#EDF1F8' }}>Áreas bajo vigilancia</h2>
                 <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#5E6C87' }}>4 · 24/7</span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 12, marginBottom: 4 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(3,1fr)', gap: 12, marginBottom: 4 }}>
                 {[
-                  { icon: '🔑', label: 'Credenciales', category: 'credentials', plain: 'Filtraciones en internet', tech: 'breach · HIBP' },
+                  { icon: '🔑', label: 'Credenciales', category: 'credentials', plain: 'Filtraciones en internet', tech: 'breach monitoring · HIBP' },
                   { icon: '✉️', label: 'Correo', category: 'email_security', plain: 'Protección del correo', tech: 'SPF · DKIM · DMARC' },
-                  { icon: '🔒', label: 'Certificado TLS', category: 'tls', plain: 'Cifrado de tu web', tech: 'TLS · HTTPS' },
-                  { icon: '🔍', label: 'OSINT', category: 'osint', plain: 'Exposición pública', tech: 'surface · ports' },
+                  { icon: '🔒', label: 'Certificado TLS', category: 'tls', plain: 'Cifrado de tu web', tech: 'TLS · HTTPS · cert expiry' },
+                  { icon: '🟢', label: 'Disponibilidad', category: 'uptime', plain: 'Tu sitio está online', tech: 'uptime · response time' },
+                  { icon: '🛡️', label: 'Headers web', category: 'headers', plain: 'Protección del navegador', tech: 'HSTS · CSP · X-Frame' },
+                  { icon: '🔍', label: 'Subdominios', category: 'subdomains', plain: 'Superficie expuesta', tech: 'CT logs · crt.sh · active subs' },
                 ].map((a, i) => {
                   const status = areaStatus(a.category)
                   const areaFindings = findings.filter(f => f.category === a.category)

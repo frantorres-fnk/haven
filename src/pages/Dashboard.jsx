@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const SCANNER_URL = import.meta.env.VITE_SCANNER_URL || 'https://scanner.franzthorres.workers.dev'
@@ -94,6 +94,7 @@ export default function Dashboard() {
   const [checkingOut, setCheckingOut] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768)
@@ -113,10 +114,25 @@ export default function Dashboard() {
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { navigate('/login'); return }
-    const { data: orgData } = await supabase.from('organizations').select('*').eq('id', user.id).single()
-    const { data: domainData } = await supabase.from('domains').select('*').eq('org_id', user.id).eq('is_primary', true).single()
+
+    const { data: orgData } = await supabase
+      .from('organizations').select('*').eq('id', user.id).single()
     if (orgData) setOrg(orgData)
-    if (domainData) { setDomain(domainData); await loadLatestScan(domainData.id, orgData.id) }
+
+    const domainId = searchParams.get('domain')
+
+    let domainQuery = supabase.from('domains').select('*').eq('org_id', user.id)
+    if (domainId) {
+      domainQuery = domainQuery.eq('id', domainId)
+    } else {
+      domainQuery = domainQuery.eq('is_primary', true)
+    }
+    const { data: domainData } = await domainQuery.single()
+
+    if (domainData) {
+      setDomain(domainData)
+      await loadLatestScan(domainData.id, user.id)
+    }
     setLoading(false)
   }
 
@@ -230,15 +246,17 @@ export default function Dashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {/* Domain chip — oculto en mobile */}
             {!isMobile && domain && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: '#93A1BC', padding: '7px 13px', border: '1px solid #1A2240', borderRadius: 8, background: '#0C1220' }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#34D399', boxShadow: '0 0 8px #34D399', display: 'inline-block' }} />
-                {domain.domain}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button onClick={() => navigate('/domains')} style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#4F7EFF', background: 'rgba(79,126,255,.1)', border: '1px solid rgba(79,126,255,.2)', padding: '6px 12px', borderRadius: 8, cursor: 'pointer' }}>
+                  ← Dominios
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, color: '#93A1BC', padding: '7px 13px', border: '1px solid #1A2240', borderRadius: 8, background: '#0C1220' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ADE80', boxShadow: '0 0 8px #4ADE80', display: 'inline-block' }} />
+                  {domain.domain}
+                  {!domain.is_primary && <span style={{ fontSize: 10, color: '#5E6C87', fontFamily: 'Inter,sans-serif' }}>· Proveedor</span>}
+                </div>
               </div>
             )}
-
-            <button onClick={() => navigate('/domains')} style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: isMobile ? 12 : 13, color: '#4F7EFF', background: 'rgba(79,126,255,.1)', border: '1px solid rgba(79,126,255,.3)', padding: isMobile ? '6px 10px' : '7px 14px', borderRadius: 8, cursor: 'pointer' }}>
-              Dominios
-            </button>
 
             {/* Role switch */}
             <div style={{ display: 'flex', background: '#0C1220', border: '1px solid #1A2240', borderRadius: 10, padding: 3 }}>

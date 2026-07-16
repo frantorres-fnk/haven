@@ -218,14 +218,11 @@ export default function Dashboard() {
         <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, gap: 10 }}>
           {/* BRAND */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-            <svg width="28" height="33" viewBox="0 0 120 138" fill="none">
-              <path d="M50 0 L100 0 Q120 0 120 22 L120 68 Q120 105 60 120 Q0 105 0 68 L0 22 Q0 0 20 0 Z" fill="#2DD4BF"/>
-              <rect x="22" y="28" width="18" height="64" fill="#06231f" rx="3"/>
-              <rect x="80" y="28" width="18" height="64" fill="#06231f" rx="3"/>
-              <rect x="22" y="56" width="76" height="14" fill="#06231f" rx="2"/>
-            </svg>
-            <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 17, letterSpacing: '.04em', color: '#EDF1F8' }}>
-              HAVEN<span style={{ color: '#2DD4BF' }}>.</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+              <div style={{ width: 28, height: 3, background: '#2DD4BF', borderRadius: 2, marginBottom: 3 }} />
+              <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20, letterSpacing: '0.08em', color: '#EDF1F8', lineHeight: 1 }}>
+                HAVEN
+              </div>
             </div>
           </div>
 

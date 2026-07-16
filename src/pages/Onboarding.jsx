@@ -77,9 +77,10 @@ export default function Onboarding() {
   return (
     <div style={s.page}>
       <div style={s.logo}>
-        <LogoMark />
-        <h1 style={s.logoText}>HAVEN</h1>
-        <p style={s.logoSub}>by Fenikso</p>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{ width: 44, height: 3.5, background: '#2DD4BF', borderRadius: 2, marginBottom: 5 }} />
+          <h1 style={s.logoText}>HAVEN</h1>
+        </div>
       </div>
 
       <div style={s.steps}>
@@ -183,7 +184,7 @@ export default function Onboarding() {
 const s = {
   page: { minHeight: '100vh', background: '#0A0F1C', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' },
   logo: { textAlign: 'center', marginBottom: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center' },
-  logoText: { fontFamily: "'Space Grotesk', sans-serif", fontSize: '26px', fontWeight: 700, color: '#EDF1F8', letterSpacing: '.06em', marginTop: '8px', marginBottom: 0 },
+  logoText: { fontFamily: "'Space Grotesk', sans-serif", fontSize: '34px', fontWeight: 700, color: '#EDF1F8', letterSpacing: '.08em', margin: 0 },
   logoSub: { fontSize: '11px', color: '#5E6C87', letterSpacing: '.18em', textTransform: 'uppercase', marginTop: '4px' },
   steps: { display: 'flex', alignItems: 'center', marginBottom: '24px' },
   stepWrap: { display: 'flex', alignItems: 'center' },

@@ -25,14 +25,10 @@ export default function Login() {
   return (
     <div style={s.page}>
       <div style={s.logo}>
-        <svg width="64" height="74" viewBox="0 0 120 138" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M50 0 L100 0 Q120 0 120 22 L120 68 Q120 105 60 120 Q0 105 0 68 L0 22 Q0 0 20 0 Z" fill="#2DD4BF"/>
-          <rect x="22" y="28" width="18" height="64" fill="#06231f" rx="3"/>
-          <rect x="80" y="28" width="18" height="64" fill="#06231f" rx="3"/>
-          <rect x="22" y="56" width="76" height="14" fill="#06231f" rx="2"/>
-        </svg>
-        <h1 style={s.logoText}>HAVEN</h1>
-        <p style={s.logoSub}>by Fenikso</p>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{ width: 52, height: 4, background: '#2DD4BF', borderRadius: 2, marginBottom: 6 }} />
+          <h1 style={s.logoText}>HAVEN</h1>
+        </div>
       </div>
       <div style={s.card}>
         <h2 style={s.title}>Bienvenido de vuelta</h2>
@@ -79,7 +75,7 @@ export default function Login() {
 const s = {
   page: { minHeight: '100vh', background: '#0A0F1C', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' },
   logo: { textAlign: 'center', marginBottom: '32px', display: 'flex', flexDirection: 'column', alignItems: 'center' },
-  logoText: { fontFamily: "'Space Grotesk', sans-serif", fontSize: '28px', fontWeight: 700, color: '#EDF1F8', letterSpacing: '.06em', marginTop: '8px', marginBottom: 0 },
+  logoText: { fontFamily: "'Space Grotesk', sans-serif", fontSize: '42px', fontWeight: 700, color: '#EDF1F8', letterSpacing: '.08em', margin: 0 },
   logoSub: { fontSize: '11px', color: '#5E6C87', letterSpacing: '.18em', textTransform: 'uppercase', marginTop: '4px' },
   card: { background: '#131B2C', border: '1px solid #25304A', borderRadius: '16px', padding: '40px', width: '100%', maxWidth: '420px' },
   title: { fontFamily: "'Space Grotesk', sans-serif", fontSize: '22px', fontWeight: 700, color: '#EDF1F8', marginBottom: '8px' },

@@ -328,9 +328,9 @@ export default function Dashboard() {
               {/* AREAS */}
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '28px 0 12px' }}>
                 <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600, fontSize: 15, color: '#EDF1F8' }}>Áreas bajo vigilancia</h2>
-                <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#5E6C87' }}>8 · 24/7</span>
+                <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: '#5E6C87' }}>9 · 24/7</span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 12, marginBottom: 4 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(3,1fr)', gap: 12, marginBottom: 4 }}>
                 {[
                   { icon: '🔑', label: 'Credenciales', category: 'credentials', plain: 'Filtraciones en internet', tech: 'breach monitoring · HIBP' },
                   { icon: '✉️', label: 'Correo', category: 'email_security', plain: 'Protección del correo', tech: 'SPF · DKIM · DMARC' },
@@ -340,6 +340,7 @@ export default function Dashboard() {
                   { icon: '🔍', label: 'Subdominios', category: 'subdomains', plain: 'Superficie expuesta', tech: 'CT logs · crt.sh · active subs' },
                   { icon: '🌐', label: 'Reputación', category: 'reputation', plain: 'Reportes de amenazas externos', tech: 'URLScan.io · threat intel' },
                   { icon: '💻', label: 'Exposición código', category: 'exposure', plain: 'Datos en repos públicos', tech: 'GitHub · code exposure' },
+                  { icon: '🕵️', label: 'Dark Web', category: 'darkweb', plain: 'Menciones en dark web y leaks', tech: 'IntelX · paste sites · leaks' },
                 ].map((a, i) => {
                   const status = areaStatus(a.category)
                   const areaFindings = findings.filter(f => f.category === a.category)

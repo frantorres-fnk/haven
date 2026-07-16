@@ -400,7 +400,7 @@ export default function Dashboard() {
                   { icon: '🌐', label: 'Reputación', category: 'reputation', plain: 'Reportes de amenazas externos', tech: 'URLScan.io · threat intel' },
                   { icon: '💻', label: 'Exposición código', category: 'exposure', plain: 'Datos en repos públicos', tech: 'GitHub · code exposure' },
                   { icon: '🕵️', label: 'Dark Web', category: 'darkweb', plain: 'Menciones en dark web y leaks', tech: 'IntelX · paste sites · leaks' },
-                  { icon: '🎭', label: 'Typosquatting', category: 'typosquatting', plain: 'Dominios que imitan tu marca', tech: 'lookalikes · brand protection' },
+                  { icon: '🎭', label: 'Typosquatting / Lookalikes', category: 'typosquatting', plain: 'Dominios que imitan tu marca', tech: 'homoglyphs · lookalikes · brand protection' },
                 ].map((a, i) => {
                   const status = areaStatus(a.category)
                   const areaFindings = findings.filter(f => f.category === a.category)

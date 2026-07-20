@@ -1,7 +1,25 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
-  font-family: 'Inter', system-ui, sans-serif;
-  background: #0A0F1C;
-  color: #EDF1F8;
+  font-family: 'Manrope', system-ui, sans-serif;
+  background: #080b12;
+  color: #e8ecf5;
   -webkit-font-smoothing: antialiased;
+}
+
+@keyframes ringDraw {
+  from { stroke-dashoffset: 402.12; }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.ring-track {
+  animation: ringDraw 1.2s cubic-bezier(.4,0,.2,1) forwards;
+}
+
+.fade-up {
+  animation: fadeUp .5s ease forwards;
 }

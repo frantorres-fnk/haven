@@ -154,7 +154,7 @@ export default function Login() {
               Toda tu superficie de ataque, en una sola pantalla.
             </h1>
             <p style={s.tagline}>
-              Haven vigila tus dominios, correo, credenciales filtradas y la dark web — y te dice, en criollo, qué conviene resolver primero.
+              Haven vigila tus dominios, correo, credenciales filtradas y la dark web — y te dice, en simples palabras, qué conviene resolver primero.
             </p>
           </div>
 

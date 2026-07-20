@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import Wordmark from '../components/Wordmark'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -25,10 +26,7 @@ export default function Login() {
   return (
     <div style={s.page}>
       <div style={s.logo}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{ width: 52, height: 4, background: '#4F7EFF', borderRadius: 2, marginBottom: 6 }} />
-          <h1 style={s.logoText}>HAVEN</h1>
-        </div>
+        <Wordmark size={48} variant="outline" gap={14} />
       </div>
       <div style={s.card}>
         <h2 style={s.title}>Bienvenido de vuelta</h2>
@@ -75,8 +73,6 @@ export default function Login() {
 const s = {
   page: { minHeight: '100vh', background: '#080C18', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' },
   logo: { textAlign: 'center', marginBottom: '32px', display: 'flex', flexDirection: 'column', alignItems: 'center' },
-  logoText: { fontFamily: "'Space Grotesk', sans-serif", fontSize: '42px', fontWeight: 700, color: '#EDF1F8', letterSpacing: '.08em', margin: 0 },
-  logoSub: { fontSize: '11px', color: '#5E6C87', letterSpacing: '.18em', textTransform: 'uppercase', marginTop: '4px' },
   card: { background: '#0C1220', border: '1px solid #1A2240', borderRadius: '16px', padding: '40px', width: '100%', maxWidth: '420px' },
   title: { fontFamily: "'Space Grotesk', sans-serif", fontSize: '22px', fontWeight: 700, color: '#EDF1F8', marginBottom: '8px' },
   sub: { fontSize: '14px', color: '#93A1BC', marginBottom: '28px' },

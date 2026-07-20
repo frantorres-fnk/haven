@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import Wordmark from '../components/Wordmark'
 
 const SCANNER_URL = import.meta.env.VITE_SCANNER_URL || 'https://scanner.franzthorres.workers.dev'
 
@@ -213,7 +214,7 @@ export default function Dashboard() {
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#080C18', display: 'grid', placeItems: 'center' }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: '24px', color: '#4F7EFF', marginBottom: '12px' }}>HAVEN<span style={{ color: '#4F7EFF' }}>.</span></div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}><Wordmark size={40} variant="outline" /></div>
         <p style={{ color: '#5E6C87', fontSize: '14px' }}>Cargando tu portal...</p>
       </div>
     </div>
@@ -233,14 +234,7 @@ export default function Dashboard() {
       <header style={{ borderBottom: '1px solid #1A2240', position: 'sticky', top: 0, zIndex: 20, background: 'rgba(10,15,28,.85)', backdropFilter: 'blur(14px)' }}>
         <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, gap: 10 }}>
           {/* BRAND */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-              <div style={{ width: 28, height: 3, background: '#4F7EFF', borderRadius: 2, marginBottom: 3 }} />
-              <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20, letterSpacing: '0.08em', color: '#EDF1F8', lineHeight: 1 }}>
-                HAVEN
-              </div>
-            </div>
-          </div>
+          <Wordmark size={34} variant="solid" />
 
           {/* RIGHT */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

@@ -1,5 +1,11 @@
-﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" fill="#080C18" rx="6"/>
-  <rect x="4" y="6" width="12" height="3" fill="#4F7EFF" rx="1.5"/>
-  <text x="4" y="26" font-family="'Space Grotesk', system-ui, sans-serif" font-weight="700" font-size="18" fill="#EDF1F8" letter-spacing="1">HV</text>
+<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="hv" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6d7bff"/>
+      <stop offset="1" stop-color="#8a5bf5"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="48" height="48" rx="12" fill="url(#hv)"/>
+  <path d="M12 32l12-14 12 14" fill="none" stroke="#0a0e17" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M17 36h14" stroke="#0a0e17" stroke-width="4" stroke-linecap="round"/>
 </svg>

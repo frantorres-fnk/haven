@@ -184,13 +184,13 @@ export default function Admin() {
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', fontSize: 12, color: '#93A1BC', marginBottom: 6 }}>Email admin</label>
             <input type="email" style={{ width: '100%', background: '#080C18', border: '1px solid #1A2240', borderRadius: 9, padding: '11px 14px', color: '#EDF1F8', fontSize: 14, outline: 'none', fontFamily: 'Inter,sans-serif' }}
-              placeholder="francisco.torres@fenikso.io" value={authEmail}
+              placeholder="Email" value={authEmail}
               onChange={e => setAuthEmail(e.target.value)} required />
           </div>
           <div style={{ marginBottom: 20 }}>
             <label style={{ display: 'block', fontSize: 12, color: '#93A1BC', marginBottom: 6 }}>Contraseña</label>
             <input type="password" style={{ width: '100%', background: '#080C18', border: '1px solid #1A2240', borderRadius: 9, padding: '11px 14px', color: '#EDF1F8', fontSize: 14, outline: 'none', fontFamily: 'Inter,sans-serif' }}
-              placeholder="••••••••" value={authPassword}
+              placeholder="Contraseña" value={authPassword}
               onChange={e => setAuthPassword(e.target.value)} required />
           </div>
           {authError && <p style={{ color: '#FB6B6B', fontSize: 13, marginBottom: 16, background: 'rgba(251,107,107,.1)', padding: '10px 14px', borderRadius: 8 }}>{authError}</p>}

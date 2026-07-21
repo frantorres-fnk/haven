@@ -22,9 +22,9 @@ export default function Admin() {
   useEffect(() => { checkAdminAndLoad() }, [])
 
   async function checkAdminAndLoad() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setChecking(false); return }
-    await verifyAdminAndLoad(user)
+    // Admin siempre pide credenciales — no reutiliza sesión activa
+    setChecking(false)
+    setLoading(false)
   }
 
   async function verifyAdminAndLoad(user) {
@@ -52,12 +52,38 @@ export default function Admin() {
     e.preventDefault()
     setAuthLoading(true)
     setAuthError('')
+
+    // Cerrar sesión previa primero
+    await supabase.auth.signOut()
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email: authEmail,
       password: authPassword,
     })
-    if (error) { setAuthError('Credenciales incorrectas'); setAuthLoading(false); return }
-    await verifyAdminAndLoad(data.user)
+
+    if (error) {
+      setAuthError('Credenciales incorrectas')
+      setAuthLoading(false)
+      return
+    }
+
+    // Verificar que el email esté en admin_users
+    const { data: adminData } = await supabase
+      .from('admin_users')
+      .select('*')
+      .eq('email', data.user.email)
+      .single()
+
+    if (!adminData) {
+      await supabase.auth.signOut()
+      setAuthError('No tenés permisos de administrador')
+      setAuthLoading(false)
+      return
+    }
+
+    setIsAdmin(true)
+    await Promise.all([loadOrgs(), loadAdmins()])
+    setLoading(false)
     setAuthLoading(false)
   }
 

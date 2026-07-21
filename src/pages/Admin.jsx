@@ -12,25 +12,46 @@ export default function Admin() {
   const [addingAdmin, setAddingAdmin] = useState(false)
   const [error, setError] = useState('')
   const [stats, setStats] = useState({ total: 0, active: 0, trialing: 0, cancelled: 0, mrr: 0 })
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
+  const [authError, setAuthError] = useState('')
+  const [checking, setChecking] = useState(true)
   const navigate = useNavigate()
 
   useEffect(() => { checkAdminAndLoad() }, [])
 
   async function checkAdminAndLoad() {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { navigate('/login'); return }
+    if (!user) { setChecking(false); return }
+    await verifyAdminAndLoad(user)
+  }
 
+  async function verifyAdminAndLoad(user) {
     const { data: adminData } = await supabase
       .from('admin_users')
       .select('*')
       .eq('email', user.email)
       .single()
 
-    if (!adminData) { navigate('/dashboard'); return }
+    if (!adminData) { setChecking(false); navigate('/dashboard'); return }
     setIsAdmin(true)
-
     await Promise.all([loadOrgs(), loadAdmins()])
+    setChecking(false)
     setLoading(false)
+  }
+
+  async function handleAdminLogin(e) {
+    e.preventDefault()
+    setAuthLoading(true)
+    setAuthError('')
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: authEmail,
+      password: authPassword,
+    })
+    if (error) { setAuthError('Credenciales incorrectas'); setAuthLoading(false); return }
+    await verifyAdminAndLoad(data.user)
+    setAuthLoading(false)
   }
 
   async function loadOrgs() {
@@ -116,13 +137,49 @@ export default function Admin() {
   const statusColor = (s) => s === 'active' ? '#4ADE80' : s === 'trialing' ? '#4F7EFF' : s === 'past_due' ? '#FBBF24' : '#FB6B6B'
   const statusLabel = (s) => s === 'active' ? 'Activo' : s === 'trialing' ? 'Trial' : s === 'past_due' ? 'Vencido' : s === 'cancelled' ? 'Cancelado' : s
 
+  if (checking) return (
+    <div style={{ minHeight: '100vh', background: '#080C18', display: 'grid', placeItems: 'center' }}>
+      <p style={{ color: '#5E6C87', fontSize: 14 }}>Verificando acceso...</p>
+    </div>
+  )
+
+  if (!isAdmin && !loading) return (
+    <div style={{ minHeight: '100vh', background: '#080C18', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 32 }}>
+        <div style={{ width: 22, height: 3, background: '#4F7EFF', borderRadius: 2, marginBottom: 6 }} />
+        <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 24, letterSpacing: '.08em', color: '#EDF1F8' }}>HAVEN</div>
+        <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: '#4F7EFF', background: 'rgba(79,126,255,.1)', border: '1px solid rgba(79,126,255,.2)', padding: '3px 10px', borderRadius: 20, letterSpacing: '.1em', marginTop: 8 }}>ADMIN</span>
+      </div>
+      <div style={{ background: '#0C1220', border: '1px solid #1A2240', borderRadius: 16, padding: 40, width: '100%', maxWidth: 400 }}>
+        <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20, color: '#EDF1F8', marginBottom: 6 }}>Acceso restringido</h2>
+        <p style={{ color: '#93A1BC', fontSize: 13, marginBottom: 24 }}>Solo administradores de HAVEN.</p>
+        <form onSubmit={handleAdminLogin}>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', fontSize: 12, color: '#93A1BC', marginBottom: 6 }}>Email admin</label>
+            <input type="email" style={{ width: '100%', background: '#080C18', border: '1px solid #1A2240', borderRadius: 9, padding: '11px 14px', color: '#EDF1F8', fontSize: 14, outline: 'none', fontFamily: 'Inter,sans-serif' }}
+              placeholder="francisco.torres@fenikso.io" value={authEmail}
+              onChange={e => setAuthEmail(e.target.value)} required />
+          </div>
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: 12, color: '#93A1BC', marginBottom: 6 }}>Contraseña</label>
+            <input type="password" style={{ width: '100%', background: '#080C18', border: '1px solid #1A2240', borderRadius: 9, padding: '11px 14px', color: '#EDF1F8', fontSize: 14, outline: 'none', fontFamily: 'Inter,sans-serif' }}
+              placeholder="••••••••" value={authPassword}
+              onChange={e => setAuthPassword(e.target.value)} required />
+          </div>
+          {authError && <p style={{ color: '#FB6B6B', fontSize: 13, marginBottom: 16, background: 'rgba(251,107,107,.1)', padding: '10px 14px', borderRadius: 8 }}>{authError}</p>}
+          <button type="submit" disabled={authLoading} style={{ width: '100%', background: '#4F7EFF', color: '#fff', border: 'none', borderRadius: 10, padding: 13, fontSize: 15, fontWeight: 700, fontFamily: "'Space Grotesk',sans-serif", cursor: 'pointer' }}>
+            {authLoading ? 'Verificando...' : 'Ingresar al panel →'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#080C18', display: 'grid', placeItems: 'center' }}>
       <p style={{ color: '#5E6C87', fontSize: 14 }}>Cargando panel de admin...</p>
     </div>
   )
-
-  if (!isAdmin) return null
 
   return (
     <div style={{ minHeight: '100vh', background: '#080C18' }}>

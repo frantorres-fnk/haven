@@ -299,15 +299,27 @@ export default function Dashboard() {
   async function loadLatestScan(domain_id) {
     const { data: scans } = await supabase.from('scans').select('*')
       .eq('domain_id', domain_id).eq('status', 'completed')
-      .order('created_at', { ascending: false }).limit(2)
-    if (scans?.length > 0) {
-      setScan(scans[0])
-      if (scans.length > 1) setPrevScan(scans[1])
-      const { data: findingsData } = await supabase.from('findings').select('*')
-        .eq('scan_id', scans[0].id).eq('status', 'open')
-        .order('severity', { ascending: true })
-      setFindings(findingsData || [])
+      .order('completed_at', { ascending: false }).limit(10)
+
+    if (!scans?.length) {
+      setScan(null); setPrevScan(null); setFindings([]); return
     }
+
+    const current = scans[0]
+    setScan(current)
+
+    // Para scans manuales, comparar contra el último scan manual anterior
+    // (los scans del cron pueden tener scores transitorios que confunden la comparación).
+    // Para scans del cron, comparar contra el inmediatamente anterior.
+    const rest = scans.slice(1)
+    const prevManual = rest.find(s => s.triggered_by === 'manual') ?? null
+    const prevAny    = rest[0] ?? null
+    setPrevScan(current.triggered_by === 'manual' ? (prevManual ?? prevAny) : prevAny)
+
+    const { data: findingsData } = await supabase.from('findings').select('*')
+      .eq('scan_id', current.id).eq('status', 'open')
+      .order('severity', { ascending: true })
+    setFindings(findingsData || [])
   }
 
   async function runScan() {
@@ -617,12 +629,16 @@ export default function Dashboard() {
                   </div>
 
                   {prevScan && (() => {
-                    const delta = scan.score - prevScan.score
+                    const delta    = scan.score - prevScan.score
+                    const absDelta = Math.abs(delta)
+                    const prevDate = prevScan.completed_at
+                      ? new Date(prevScan.completed_at).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+                      : 'scan anterior'
                     const [ic, tColor, bg, br, text] = delta > 0
-                      ? ['trending-up',   C.greenText, 'rgba(61,220,132,.08)', 'rgba(61,220,132,.18)', `↑ +${delta} pts vs scan anterior`]
+                      ? ['trending-up',   C.greenText, 'rgba(61,220,132,.08)',  'rgba(61,220,132,.18)',  `↑ +${absDelta} pts vs ${prevDate}`]
                       : delta < 0
-                      ? ['trending-down', C.red,       'rgba(242,99,126,.08)', 'rgba(242,99,126,.18)', `↓ ${Math.abs(delta)} pts vs scan anterior`]
-                      : ['minus',         C.t2,        'rgba(130,150,220,.06)', C.border,              'Sin cambios vs scan anterior']
+                      ? ['trending-down', C.red,       'rgba(242,99,126,.08)',  'rgba(242,99,126,.18)',  `↓ −${absDelta} pts vs ${prevDate}`]
+                      : ['minus',         C.t2,        'rgba(130,150,220,.06)', C.border,               `Sin cambios vs ${prevDate}`]
                     return (
                       <div style={{
                         marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 8,

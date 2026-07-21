@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard'
 import Onboarding from './pages/Onboarding'
 import Verify from './pages/Verify'
 import Domains from './pages/Domains'
+import ResetPassword from './pages/ResetPassword'
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/verify" element={<Verify />} />
         <Route path="/domains" element={<Domains />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>
     </BrowserRouter>
   )

@@ -399,7 +399,7 @@ export default function Dashboard() {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           height: 64, gap: 10,
         }}>
-          <Wordmark size={32} variant="solid" />
+          <Wordmark size={32} />
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {!isMobile && (

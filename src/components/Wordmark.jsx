@@ -1,10 +1,10 @@
 import Logo from './Logo'
 
-export default function Wordmark({ size = 32, variant = 'outline', gap = 10 }) {
+export default function Wordmark({ size = 32, gap = 10 }) {
   const fontSize = Math.round(size * 0.6)
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap, flexShrink: 0 }}>
-      <Logo size={size} variant={variant} />
+      <Logo size={size} />
       <span
         style={{
           fontFamily: "'Space Grotesk', sans-serif",

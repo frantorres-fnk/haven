@@ -463,7 +463,7 @@ export default function Domains() {
 
             <div style={{ width: 1, height: 20, background: C.border }} />
 
-            <Wordmark size={30} variant="solid" />
+            <Wordmark size={30} />
           </div>
 
           {/* Derecha: contador */}

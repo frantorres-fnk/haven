@@ -34,7 +34,14 @@ export default function Admin() {
       .eq('email', user.email)
       .single()
 
-    if (!adminData) { setChecking(false); navigate('/dashboard'); return }
+    if (!adminData) {
+      setIsAdmin(false)
+      setChecking(false)
+      setLoading(false)
+      navigate('/dashboard')
+      return
+    }
+
     setIsAdmin(true)
     await Promise.all([loadOrgs(), loadAdmins()])
     setChecking(false)

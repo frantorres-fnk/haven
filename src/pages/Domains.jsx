@@ -352,7 +352,12 @@ export default function Domains() {
       return
     }
     const cleanDomain = form.domain.toLowerCase()
-      .replace(/^www\./, '').replace(/^https?:\/\//, '')
+      .replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0].trim()
+    const DOMAIN_RE = /^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/i
+    if (!DOMAIN_RE.test(cleanDomain)) {
+      setError('Ingresá el dominio completo, por ejemplo: empresa.com o empresa.com.ar')
+      return
+    }
     setAdding(true)
     const { data: domainData, error: domainError } = await supabase
       .from('domains').insert({

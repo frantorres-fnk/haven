@@ -167,9 +167,15 @@ export default function Onboarding() {
 
   const domain = normalizeDomain(form.domain)
 
+  const DOMAIN_RE = /^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/i
+
   function handleNext() {
     if (!form.company.trim()) { setError('Ingresá el nombre de tu empresa.'); return }
     if (!form.domain.trim())  { setError('Ingresá el dominio web de tu empresa.'); return }
+    if (!DOMAIN_RE.test(domain)) {
+      setError('Ingresá el dominio completo, por ejemplo: empresa.com o empresa.com.ar')
+      return
+    }
     setError('')
     setBtnHover(false)
     setStep(2)

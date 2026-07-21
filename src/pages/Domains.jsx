@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchLatestScanCard } from '../lib/domainStats'
 import Wordmark from '../components/Wordmark'
 
 const SCANNER_URL = import.meta.env.VITE_SCANNER_URL || 'https://scanner.franzthorres.workers.dev'
@@ -333,14 +334,8 @@ export default function Domains() {
 
     if (domainsData) {
       const enriched = await Promise.all(domainsData.map(async (d) => {
-        const { data: scans } = await supabase
-          .from('scans').select('score, completed_at, status')
-          .eq('domain_id', d.id).eq('status', 'completed')
-          .order('created_at', { ascending: false }).limit(1)
-        const { data: findings } = await supabase
-          .from('findings').select('severity', { count: 'exact' })
-          .eq('domain_id', d.id).eq('status', 'open')
-        return { ...d, lastScan: scans?.[0] || null, findingsCount: findings?.length || 0 }
+        const { lastScan, findingsCount } = await fetchLatestScanCard(d.id)
+        return { ...d, lastScan, findingsCount }
       }))
       setDomains(enriched)
     }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchCompletedScans, fetchOpenFindings } from '../lib/domainStats'
 import Wordmark from '../components/Wordmark'
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
@@ -297,11 +298,9 @@ export default function Dashboard() {
   }
 
   async function loadLatestScan(domain_id) {
-    const { data: scans } = await supabase.from('scans').select('*')
-      .eq('domain_id', domain_id).eq('status', 'completed')
-      .order('completed_at', { ascending: false }).limit(10)
+    const scans = await fetchCompletedScans(domain_id, 10)
 
-    if (!scans?.length) {
+    if (!scans.length) {
       setScan(null); setPrevScan(null); setFindings([]); return
     }
 
@@ -316,10 +315,7 @@ export default function Dashboard() {
     const prevAny    = rest[0] ?? null
     setPrevScan(current.triggered_by === 'manual' ? (prevManual ?? prevAny) : prevAny)
 
-    const { data: findingsData } = await supabase.from('findings').select('*')
-      .eq('scan_id', current.id).eq('status', 'open')
-      .order('severity', { ascending: true })
-    setFindings(findingsData || [])
+    setFindings(await fetchOpenFindings(current.id))
   }
 
   async function runScan() {

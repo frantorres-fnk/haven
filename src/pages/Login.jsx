@@ -55,6 +55,11 @@ export default function Login() {
   const [btnHover,    setBtnHover]      = useState(false)
   const [googleHover, setGoogleHover]   = useState(false)
   const [msHover,     setMsHover]       = useState(false)
+  const [showReset,    setShowReset]    = useState(false)
+  const [resetEmail,   setResetEmail]   = useState('')
+  const [resetSent,    setResetSent]    = useState(false)
+  const [resetError,   setResetError]   = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
   const navigate = useNavigate()
 
   async function handleSubmit(e) {
@@ -68,6 +73,21 @@ export default function Login() {
     } else {
       navigate('/dashboard')
     }
+  }
+
+  async function handleReset(e) {
+    e.preventDefault()
+    setResetLoading(true)
+    setResetError('')
+    const { error: resetErr } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: 'https://haven.fenikso.io/reset-password',
+    })
+    if (resetErr) {
+      setResetError(resetErr.message)
+    } else {
+      setResetSent(true)
+    }
+    setResetLoading(false)
   }
 
   function onGoogleLogin() {}
@@ -181,6 +201,60 @@ export default function Login() {
         <div className="hv-form-side">
           <div style={s.formWrap} className="hv-form-animate">
 
+            {showReset ? (
+              /* ── Panel recuperación de contraseña ── */
+              <div style={{ marginTop: '8px' }}>
+                <h2 style={s.formTitle}>Recuperar contraseña</h2>
+                <p style={s.formSub}>Ingresá tu email y te mandamos un link para restablecer tu contraseña.</p>
+
+                {!resetSent ? (
+                  <form onSubmit={handleReset} style={{ marginTop: '28px' }}>
+                    <div style={s.fieldGroup}>
+                      <label style={s.fieldLabel}>Email</label>
+                      <div style={s.inputWrap}>
+                        <span style={s.iconLeft}><IconMail /></span>
+                        <input
+                          style={s.input}
+                          type="email"
+                          placeholder="vos@tuempresa.com"
+                          value={resetEmail}
+                          onChange={e => setResetEmail(e.target.value)}
+                          required
+                          autoComplete="email"
+                        />
+                      </div>
+                    </div>
+
+                    {resetError && <div style={s.errorBox}>{resetError}</div>}
+
+                    <button
+                      type="submit"
+                      disabled={resetLoading}
+                      style={{ ...s.submitBtn, ...(resetLoading ? { opacity: .7, cursor: 'not-allowed' } : {}) }}
+                    >
+                      {resetLoading ? 'Enviando…' : 'Enviar link'}
+                    </button>
+                  </form>
+                ) : (
+                  <div style={{ marginTop: '28px', ...s.successBox }}>
+                    Te mandamos un link a tu mail
+                  </div>
+                )}
+
+                <p style={{ ...s.footerText, marginTop: '20px' }}>
+                  <a
+                    href="#"
+                    className="hv-footer-link"
+                    style={s.footerLink}
+                    onClick={e => { e.preventDefault(); setShowReset(false); setResetSent(false); setResetError('') }}
+                  >
+                    ← Volver al login
+                  </a>
+                </p>
+              </div>
+            ) : (
+              <>
+
             <h2 style={s.formTitle}>Bienvenido de vuelta</h2>
             <p style={s.formSub}>Ingresá para ver el estado de tu empresa.</p>
 
@@ -213,7 +287,7 @@ export default function Login() {
                     href="#"
                     className="hv-forgot"
                     style={s.forgotLink}
-                    onClick={e => e.preventDefault()}
+                    onClick={e => { e.preventDefault(); setShowReset(true); setResetEmail(email); setResetSent(false); setResetError('') }}
                   >
                     ¿La olvidaste?
                   </a>
@@ -324,6 +398,8 @@ export default function Login() {
                 Empezá tu prueba gratis
               </Link>
             </p>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -540,6 +616,16 @@ const s = {
     marginBottom: '16px',
     fontSize: '13px',
     color: '#fca5a5',
+  },
+
+  successBox: {
+    background: 'rgba(74,222,128,.08)',
+    border: '1px solid rgba(74,222,128,.22)',
+    borderRadius: '9px',
+    padding: '14px 16px',
+    fontSize: '14px',
+    color: '#4ade80',
+    fontWeight: 500,
   },
 
   checkRow: {

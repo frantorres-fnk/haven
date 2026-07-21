@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
+const SCANNER_URL = import.meta.env.VITE_SCANNER_URL || 'https://scanner.franzthorres.workers.dev'
+
+async function getAuthToken() {
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.access_token
+}
+
 export default function Admin() {
   const [orgs, setOrgs] = useState([])
   const [admins, setAdmins] = useState([])
@@ -88,37 +95,24 @@ export default function Admin() {
   }
 
   async function loadOrgs() {
-    const { data: orgsData } = await supabase
-      .from('organizations')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const token = await getAuthToken()
+    const res = await fetch(`${SCANNER_URL}/admin/data`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    const data = await res.json()
+    if (!data.ok) return
 
-    if (!orgsData) return
-
-    const orgsWithData = await Promise.all(orgsData.map(async (org) => {
-      const { data: domains } = await supabase
-        .from('domains')
-        .select('id, domain, verified, monitoring_active, last_scan_at')
-        .eq('org_id', org.id)
-
-      const primaryDomain = domains?.find(d => d.is_primary) || domains?.[0]
-
-      let lastScore = null
-      if (primaryDomain) {
-        const { data: scans } = await supabase
-          .from('scans')
-          .select('score, completed_at')
-          .eq('domain_id', primaryDomain.id)
-          .eq('status', 'completed')
-          .order('created_at', { ascending: false })
-          .limit(1)
-        lastScore = scans?.[0]?.score || null
-      }
-
-      return { ...org, domains: domains || [], primaryDomain, lastScore }
-    }))
+    const orgsWithData = data.orgs.map(org => {
+      const orgDomains = data.domains.filter(d => d.org_id === org.id)
+      const primaryDomain = orgDomains.find(d => d.is_primary) || orgDomains[0]
+      const lastScan = primaryDomain
+        ? data.scans.find(s => s.domain_id === primaryDomain.id)
+        : null
+      return { ...org, domains: orgDomains, primaryDomain, lastScore: lastScan?.score || null }
+    })
 
     setOrgs(orgsWithData)
+    setAdmins(data.admins)
 
     const planPrices = { advanced: 99, premium: 199, elite: 299 }
     const active = orgsWithData.filter(o => o.status === 'active')
@@ -126,38 +120,39 @@ export default function Admin() {
     const cancelled = orgsWithData.filter(o => o.status === 'cancelled')
     const mrr = active.reduce((sum, o) => sum + (planPrices[o.plan] || 0), 0)
 
-    setStats({
-      total: orgsWithData.length,
-      active: active.length,
-      trialing: trialing.length,
-      cancelled: cancelled.length,
-      mrr,
-    })
+    setStats({ total: orgsWithData.length, active: active.length, trialing: trialing.length, cancelled: cancelled.length, mrr })
   }
 
   async function loadAdmins() {
-    const { data } = await supabase.from('admin_users').select('*').order('created_at', { ascending: true })
-    setAdmins(data || [])
+    // Datos ya cargados en loadOrgs vía /admin/data
   }
 
   async function handleAddAdmin(e) {
     e.preventDefault()
     setError('')
     setAddingAdmin(true)
-    const { error } = await supabase.from('admin_users').insert({
-      email: newAdmin.email.toLowerCase().trim(),
-      name: newAdmin.name,
+    const token = await getAuthToken()
+    const res = await fetch(`${SCANNER_URL}/admin/users`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: newAdmin.email.toLowerCase().trim(), name: newAdmin.name })
     })
-    if (error) { setError(error.message); setAddingAdmin(false); return }
+    const data = await res.json()
+    if (!data.ok) { setError('Error agregando admin'); setAddingAdmin(false); return }
     setNewAdmin({ email: '', name: '' })
-    await loadAdmins()
+    await loadOrgs()
     setAddingAdmin(false)
   }
 
   async function handleRemoveAdmin(id) {
     if (!confirm('¿Eliminar este admin?')) return
-    await supabase.from('admin_users').delete().eq('id', id)
-    await loadAdmins()
+    const token = await getAuthToken()
+    await fetch(`${SCANNER_URL}/admin/users`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    })
+    await loadOrgs()
   }
 
   async function handleLogout() {

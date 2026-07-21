@@ -275,7 +275,7 @@ export default function Onboarding() {
                 </span>
                 <input
                   style={{ ...s.input, ...(fCompany ? s.inputFocus : {}) }}
-                  placeholder="Acme S.A."
+                  placeholder="Empresa S.A."
                   value={form.company}
                   onChange={e => update('company', e.target.value)}
                   onFocus={() => setFCompany(true)}
@@ -293,7 +293,7 @@ export default function Onboarding() {
                 </span>
                 <input
                   style={{ ...s.input, ...(fDomain ? s.inputFocus : {}) }}
-                  placeholder="miempresa.com.py"
+                  placeholder="miempresa.com"
                   value={form.domain}
                   onChange={e => update('domain', e.target.value)}
                   onFocus={() => setFDomain(true)}

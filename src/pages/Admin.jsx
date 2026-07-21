@@ -144,13 +144,7 @@ export default function Admin() {
   const statusColor = (s) => s === 'active' ? '#4ADE80' : s === 'trialing' ? '#4F7EFF' : s === 'past_due' ? '#FBBF24' : '#FB6B6B'
   const statusLabel = (s) => s === 'active' ? 'Activo' : s === 'trialing' ? 'Trial' : s === 'past_due' ? 'Vencido' : s === 'cancelled' ? 'Cancelado' : s
 
-  if (checking) return (
-    <div style={{ minHeight: '100vh', background: '#080C18', display: 'grid', placeItems: 'center' }}>
-      <p style={{ color: '#5E6C87', fontSize: 14 }}>Verificando acceso...</p>
-    </div>
-  )
-
-  if (!isAdmin && !loading) return (
+  if (!isAdmin && !loading && !checking) return (
     <div style={{ minHeight: '100vh', background: '#080C18', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 32 }}>
         <div style={{ width: 22, height: 3, background: '#4F7EFF', borderRadius: 2, marginBottom: 6 }} />
@@ -182,9 +176,11 @@ export default function Admin() {
     </div>
   )
 
-  if (loading) return (
+  if (checking || (isAdmin && loading)) return (
     <div style={{ minHeight: '100vh', background: '#080C18', display: 'grid', placeItems: 'center' }}>
-      <p style={{ color: '#5E6C87', fontSize: 14 }}>Cargando panel de admin...</p>
+      <p style={{ color: '#5E6C87', fontSize: 14 }}>
+        {checking ? 'Verificando acceso...' : 'Cargando panel de admin...'}
+      </p>
     </div>
   )
 

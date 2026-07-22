@@ -152,6 +152,20 @@ function PlanBadge({ plan }) {
   )
 }
 
+// ─── Billing type badge ─────────────────────────────────────────────────────────
+function TransferBadge() {
+  return (
+    <span style={{
+      fontFamily: C.mono, fontSize: 10, fontWeight: 600, letterSpacing: '.08em',
+      textTransform: 'uppercase', color: C.amberText,
+      background: 'rgba(245,181,68,.1)', border: '1px solid rgba(245,181,68,.28)',
+      padding: '2px 8px', borderRadius: 20,
+    }}>
+      Transferencia
+    </span>
+  )
+}
+
 // ─── Org status badge ────────────────────────────────────────────────────────────
 function OrgStatusBadge({ status }) {
   const map = {
@@ -198,6 +212,13 @@ export default function Admin() {
   const [addingAdmin, setAddingAdmin] = useState(false)
   const [error, setError]             = useState('')
   const [stats, setStats]             = useState({ total: 0, active: 0, trialing: 0, cancelled: 0, mrr: 0 })
+  const [expandedOrgs,    setExpandedOrgs]    = useState({})
+  const [modal,           setModal]           = useState(null)
+  const [modalInput,      setModalInput]      = useState('')
+  const [modalLoading,    setModalLoading]    = useState(false)
+  const [modalError,      setModalError]      = useState('')
+  const [selectedPlan,    setSelectedPlan]    = useState('advanced')
+  const [selectedBilling, setSelectedBilling] = useState('stripe')
 
   const [authEmail,    setAuthEmail]    = useState('')
   const [authPassword, setAuthPassword] = useState('')
@@ -307,6 +328,36 @@ export default function Admin() {
   async function handleLogout() {
     await supabase.auth.signOut()
     navigate('/login')
+  }
+
+  // ── Acciones sobre clientes ──────────────────────────────────────────────────
+  async function execAction(orgId, endpoint, body = {}) {
+    setModalLoading(true)
+    setModalError('')
+    try {
+      const token = await getAuthToken()
+      const res = await fetch(`${SCANNER_URL}/admin/clients/${orgId}/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!data.ok) {
+        setModalError(data.error || 'Error al ejecutar la acción')
+        setModalLoading(false)
+        return
+      }
+      if (data.warnings?.length) {
+        // mostramos aviso inline después de cerrar
+        alert('⚠️ ' + data.warnings.join('\n'))
+      }
+      setModal(null)
+      setModalInput('')
+      await loadOrgs()
+    } catch (e) {
+      setModalError('Error de red: ' + e.message)
+    }
+    setModalLoading(false)
   }
 
   // ── Verificando ───────────────────────────────────────────────────────────────
@@ -561,15 +612,6 @@ export default function Admin() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button onClick={() => navigate('/dashboard')} style={{
-              fontFamily: C.body, fontWeight: 500, fontSize: 13, color: C.t2,
-              background: 'none', border: `1px solid ${C.border}`,
-              padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}>
-              <Icon name="globe" size={13} color={C.t2} />
-              Mi portal
-            </button>
             <button onClick={handleLogout} style={{
               fontFamily: C.body, fontSize: 13, color: C.t3,
               background: 'none', border: 'none',
@@ -684,79 +726,153 @@ export default function Admin() {
                           {org.name}
                         </span>
                         <PlanBadge plan={org.plan} />
-                        <OrgStatusBadge status={org.status} />
+                        {org.billing_type === 'manual_transfer'
+                          ? <TransferBadge />
+                          : <OrgStatusBadge status={org.status} />
+                        }
                       </div>
 
-                      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                        {[
-                          {
-                            label: 'EMAIL',
-                            value: org.email || '—',
-                            color: C.t2,
-                          },
-                          {
-                            label: 'DOMINIOS',
-                            value: `${org.domains.length} · ${org.primaryDomain?.domain || '—'}`,
-                            color: C.t2,
-                          },
-                          {
-                            label: 'CLIENTE DESDE',
-                            value: org.created_at
-                              ? new Date(org.created_at).toLocaleDateString('es-AR')
-                              : '—',
-                            color: C.t2,
-                          },
-                          {
-                            label: 'TRIAL VENCE',
-                            value: org.trial_ends_at
-                              ? new Date(org.trial_ends_at).toLocaleDateString('es-AR')
-                              : '—',
-                            color: org.trial_ends_at ? tColor : C.t2,
-                          },
-                        ].map(({ label, value, color }) => (
-                          <div key={label}>
-                            <div style={{
-                              fontFamily: C.mono, fontSize: 9.5, color: C.t3,
-                              textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 4,
-                            }}>
-                              {label}
+                      <div>
+                        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 10 }}>
+                          {[
+                            {
+                              label: 'EMAIL',
+                              value: org.email || '—',
+                              color: C.t2,
+                            },
+                            {
+                              label: 'CLIENTE DESDE',
+                              value: org.created_at
+                                ? new Date(org.created_at).toLocaleDateString('es-AR')
+                                : '—',
+                              color: C.t2,
+                            },
+                            {
+                              label: 'TRIAL VENCE',
+                              value: org.trial_ends_at
+                                ? new Date(org.trial_ends_at).toLocaleDateString('es-AR')
+                                : '—',
+                              color: org.trial_ends_at ? tColor : C.t2,
+                            },
+                          ].map(({ label, value, color }) => (
+                            <div key={label}>
+                              <div style={{
+                                fontFamily: C.mono, fontSize: 9.5, color: C.t3,
+                                textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 4,
+                              }}>
+                                {label}
+                              </div>
+                              <div style={{ fontSize: 13, color, fontFamily: C.body }}>
+                                {value}
+                              </div>
                             </div>
-                            <div style={{ fontSize: 13, color, fontFamily: C.body }}>
-                              {value}
-                            </div>
+                          ))}
+                        </div>
+
+                        {/* Dominios expandibles */}
+                        <div>
+                          <div style={{
+                            fontFamily: C.mono, fontSize: 9.5, color: C.t3,
+                            textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 6,
+                          }}>
+                            DOMINIOS ({org.domains.length})
                           </div>
-                        ))}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                            {(expandedOrgs[org.id] ? org.domains : org.domains.slice(0, 2)).map(d => (
+                              <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{
+                                  fontFamily: C.mono, fontSize: 9, fontWeight: 600, letterSpacing: '.05em',
+                                  padding: '1px 6px', borderRadius: 4, flexShrink: 0,
+                                  ...(d.is_primary
+                                    ? { color: C.link, background: 'rgba(91,110,245,.12)', border: '1px solid rgba(91,110,245,.25)' }
+                                    : { color: C.t3,  background: 'rgba(130,150,220,.06)', border: `1px solid ${C.border}` }
+                                  ),
+                                }}>
+                                  {d.is_primary ? 'PRIMARY' : 'SUPPLIER'}
+                                </span>
+                                <span style={{ fontFamily: C.mono, fontSize: 12, color: C.t2 }}>{d.domain}</span>
+                              </div>
+                            ))}
+                            {org.domains.length > 2 && (
+                              <button
+                                onClick={e => { e.stopPropagation(); setExpandedOrgs(prev => ({ ...prev, [org.id]: !prev[org.id] })) }}
+                                style={{
+                                  fontFamily: C.mono, fontSize: 10, color: C.link,
+                                  background: 'none', border: 'none', cursor: 'pointer',
+                                  padding: '2px 0', textAlign: 'left',
+                                }}
+                              >
+                                {expandedOrgs[org.id] ? '▲ Ver menos' : `▼ +${org.domains.length - 2} más`}
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
                     {/* Acciones */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }}>
-                      <button
-                        onClick={() => navigate(`/dashboard?domain=${org.primaryDomain?.id}`)}
-                        style={{
-                          fontFamily: C.title, fontWeight: 600, fontSize: 13,
-                          color: '#fff', background: C.accentBtn,
-                          border: 'none', padding: '8px 16px',
-                          borderRadius: 9, cursor: 'pointer', whiteSpace: 'nowrap',
-                          boxShadow: '0 2px 10px rgba(91,110,245,.25)',
-                        }}
-                      >
-                        Ver portal →
-                      </button>
-                      <div style={{
-                        display: 'flex', alignItems: 'center', gap: 5,
-                        fontFamily: C.mono, fontSize: 11,
-                        color: monitoring ? C.greenText : C.t3,
-                      }}>
-                        <span style={{
-                          width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                          background: monitoring ? C.green : 'rgba(130,150,220,.2)',
-                          boxShadow: monitoring ? `0 0 5px ${C.green}` : 'none',
-                          display: 'inline-block',
-                        }} />
-                        {monitoring ? 'Monitoreo activo' : 'Sin monitoreo'}
-                      </div>
-                    </div>
+                    {(() => {
+                      const isPaused = org.domains.some(d => d.monitoring_paused)
+                      const dotColor = isPaused ? C.amber : monitoring ? C.green : 'rgba(130,150,220,.2)'
+                      const txtColor = isPaused ? C.amberText : monitoring ? C.greenText : C.t3
+                      const monLabel = isPaused ? 'Pausado' : monitoring ? 'Monitoreo activo' : 'Sin monitoreo'
+
+                      const btnSm = (label, onClick, red = false) => (
+                        <button onClick={onClick} style={{
+                          fontFamily: C.mono, fontSize: 10, fontWeight: 600,
+                          letterSpacing: '.05em', whiteSpace: 'nowrap',
+                          color: red ? C.red : C.t2,
+                          background: red ? 'rgba(242,99,126,.07)' : C.card,
+                          border: `1px solid ${red ? 'rgba(242,99,126,.2)' : C.border}`,
+                          padding: '4px 10px', borderRadius: 7, cursor: 'pointer',
+                        }}>
+                          {label}
+                        </button>
+                      )
+
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+                          <button
+                            onClick={() => navigate(`/dashboard?domain=${org.primaryDomain?.id}&admin_view=1`)}
+                            style={{
+                              fontFamily: C.title, fontWeight: 600, fontSize: 13,
+                              color: '#fff', background: C.accentBtn,
+                              border: 'none', padding: '8px 16px',
+                              borderRadius: 9, cursor: 'pointer', whiteSpace: 'nowrap',
+                              boxShadow: '0 2px 10px rgba(91,110,245,.25)',
+                            }}
+                          >
+                            Ver portal →
+                          </button>
+
+                          <div style={{
+                            display: 'flex', alignItems: 'center', gap: 5,
+                            fontFamily: C.mono, fontSize: 11, color: txtColor,
+                          }}>
+                            <span style={{
+                              width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                              background: dotColor,
+                              boxShadow: isPaused ? `0 0 5px ${C.amber}` : monitoring ? `0 0 5px ${C.green}` : 'none',
+                              display: 'inline-block',
+                            }} />
+                            {monLabel}
+                          </div>
+
+                          {/* Fila de acciones rápidas */}
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            {btnSm(
+                              isPaused ? '▶ Reanudar' : '⏸ Pausar',
+                              () => setModal({ type: isPaused ? 'resume' : 'pause', org })
+                            )}
+                            {btnSm('Plan', () => { setSelectedPlan(org.plan || 'advanced'); setModal({ type: 'change-plan', org }) })}
+                          </div>
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            {btnSm('Facturación', () => { setSelectedBilling(org.billing_type || 'stripe'); setModal({ type: 'billing-type', org }) })}
+                            {btnSm('Dar de baja', () => { setModalInput(''); setModal({ type: 'cancel', org }) }, true)}
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
                 )
               })}
@@ -938,6 +1054,234 @@ export default function Admin() {
 
         </div>
       </main>
+
+      {/* ── MODAL DE ACCIONES ──────────────────────────────────────────────────── */}
+      {modal && (() => {
+        const closeModal = () => { setModal(null); setModalInput(''); setModalError('') }
+
+        const modalTitle = {
+          'billing-type': 'Tipo de facturación',
+          'pause':        '⏸ Pausar monitoreo',
+          'resume':       '▶ Reanudar monitoreo',
+          'change-plan':  'Cambiar plan',
+          'cancel':       '⚠️ Dar de baja',
+        }[modal.type]
+
+        const confirmBtn = (label, onClick, danger = false) => (
+          <button
+            onClick={onClick}
+            disabled={modalLoading}
+            style={{
+              fontFamily: C.title, fontWeight: 700, fontSize: 14,
+              color: danger ? '#fff' : '#fff',
+              background: danger ? 'linear-gradient(135deg,#d63060,#b02050)' : C.accentBtn,
+              border: 'none', padding: '10px 20px', borderRadius: 9,
+              cursor: modalLoading ? 'not-allowed' : 'pointer',
+              opacity: modalLoading ? .7 : 1, whiteSpace: 'nowrap',
+            }}
+          >
+            {modalLoading ? 'Ejecutando...' : label}
+          </button>
+        )
+
+        const cancelBtn = (
+          <button onClick={closeModal} disabled={modalLoading} style={{
+            fontFamily: C.body, fontSize: 14, color: C.t2,
+            background: 'none', border: `1px solid ${C.border}`,
+            padding: '10px 18px', borderRadius: 9, cursor: 'pointer',
+          }}>
+            Cancelar
+          </button>
+        )
+
+        const fieldLabel = (text) => (
+          <div style={{ fontFamily: C.mono, fontSize: 10, color: C.t3, letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 8 }}>
+            {text}
+          </div>
+        )
+
+        return (
+          <div
+            style={{
+              position: 'fixed', inset: 0, zIndex: 200,
+              background: 'rgba(8,11,18,.85)', backdropFilter: 'blur(5px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 20,
+            }}
+            onClick={closeModal}
+          >
+            <div
+              style={{
+                background: '#0d1526',
+                border: `1px solid ${C.borderHi}`,
+                borderTop: `2px solid ${modal.type === 'cancel' ? C.red : C.accent}`,
+                borderRadius: 18, padding: '32px 36px',
+                maxWidth: 480, width: '100%',
+                boxShadow: '0 24px 64px rgba(0,0,0,.5)',
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Título */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <h2 style={{ fontFamily: C.title, fontWeight: 700, fontSize: 18, color: C.t1, margin: 0 }}>
+                  {modalTitle}
+                </h2>
+                <button onClick={closeModal} style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: C.t3, fontSize: 20, lineHeight: 1, padding: 4,
+                }}>×</button>
+              </div>
+              <p style={{ fontSize: 13, color: C.t2, marginBottom: 24 }}>
+                {modal.org.name}
+              </p>
+
+              {/* ── BILLING TYPE ── */}
+              {modal.type === 'billing-type' && (<>
+                <div style={{ marginBottom: 20 }}>
+                  {fieldLabel('Tipo de facturación')}
+                  {[
+                    { value: 'stripe', label: 'Stripe', desc: 'Suscripción real gestionada por Stripe' },
+                    { value: 'manual_transfer', label: 'Transferencia manual', desc: 'El cliente paga a mano, sin Stripe' },
+                  ].map(opt => (
+                    <label key={opt.value} style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 10,
+                      padding: '12px 14px', borderRadius: 10, marginBottom: 8, cursor: 'pointer',
+                      background: selectedBilling === opt.value ? 'rgba(91,110,245,.1)' : C.card,
+                      border: `1px solid ${selectedBilling === opt.value ? C.accent : C.border}`,
+                    }}>
+                      <input
+                        type="radio" name="billing" value={opt.value}
+                        checked={selectedBilling === opt.value}
+                        onChange={() => setSelectedBilling(opt.value)}
+                        style={{ marginTop: 2, accentColor: C.accent }}
+                      />
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: C.t1, marginBottom: 2 }}>{opt.label}</div>
+                        <div style={{ fontSize: 12, color: C.t3 }}>{opt.desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                {modalError && <div style={{ color: C.red, fontSize: 13, marginBottom: 12 }}>{modalError}</div>}
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  {cancelBtn}
+                  {confirmBtn('Confirmar', () => execAction(modal.org.id, 'billing-type', { billing_type: selectedBilling }))}
+                </div>
+              </>)}
+
+              {/* ── PAUSE ── */}
+              {modal.type === 'pause' && (<>
+                <p style={{ fontSize: 14, color: C.t2, marginBottom: 24, lineHeight: 1.6 }}>
+                  Esto detendrá el análisis de <b style={{ color: C.t1 }}>todos los dominios</b> de este cliente.
+                  No cancela nada en Stripe ni afecta la facturación.
+                </p>
+                {modalError && <div style={{ color: C.red, fontSize: 13, marginBottom: 12 }}>{modalError}</div>}
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  {cancelBtn}
+                  {confirmBtn('Pausar monitoreo', () => execAction(modal.org.id, 'pause'))}
+                </div>
+              </>)}
+
+              {/* ── RESUME ── */}
+              {modal.type === 'resume' && (<>
+                <p style={{ fontSize: 14, color: C.t2, marginBottom: 24, lineHeight: 1.6 }}>
+                  Esto activará el análisis continuo para <b style={{ color: C.t1 }}>todos los dominios</b> de este cliente.
+                </p>
+                {modalError && <div style={{ color: C.red, fontSize: 13, marginBottom: 12 }}>{modalError}</div>}
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  {cancelBtn}
+                  {confirmBtn('Reanudar monitoreo', () => execAction(modal.org.id, 'resume'))}
+                </div>
+              </>)}
+
+              {/* ── CHANGE PLAN ── */}
+              {modal.type === 'change-plan' && (<>
+                <div style={{ marginBottom: 8 }}>
+                  {fieldLabel('Nuevo plan')}
+                  {[
+                    { value: 'advanced', label: 'Advanced', desc: '1 dominio — $99/mes' },
+                    { value: 'premium',  label: 'Premium',  desc: '3 dominios — $199/mes' },
+                    { value: 'elite',    label: 'Elite',    desc: '6 dominios — $299/mes' },
+                  ].map(opt => (
+                    <label key={opt.value} style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 10,
+                      padding: '12px 14px', borderRadius: 10, marginBottom: 8, cursor: 'pointer',
+                      background: selectedPlan === opt.value ? 'rgba(91,110,245,.1)' : C.card,
+                      border: `1px solid ${selectedPlan === opt.value ? C.accent : C.border}`,
+                    }}>
+                      <input
+                        type="radio" name="plan" value={opt.value}
+                        checked={selectedPlan === opt.value}
+                        onChange={() => setSelectedPlan(opt.value)}
+                        style={{ marginTop: 2, accentColor: C.accent }}
+                      />
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: C.t1, marginBottom: 2 }}>{opt.label}</div>
+                        <div style={{ fontSize: 12, color: C.t3 }}>{opt.desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                {modal.org.billing_type !== 'manual_transfer' && (
+                  <p style={{ fontSize: 12, color: C.t3, marginBottom: 16, lineHeight: 1.5 }}>
+                    Facturación Stripe activa: se aplicará prorrateo automático al período en curso.
+                  </p>
+                )}
+                {modalError && <div style={{ color: C.red, fontSize: 13, marginBottom: 12 }}>{modalError}</div>}
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  {cancelBtn}
+                  {confirmBtn('Cambiar plan', () => execAction(modal.org.id, 'change-plan', { new_plan: selectedPlan }))}
+                </div>
+              </>)}
+
+              {/* ── CANCEL ── */}
+              {modal.type === 'cancel' && (<>
+                <div style={{
+                  background: 'rgba(242,99,126,.07)', border: '1px solid rgba(242,99,126,.2)',
+                  borderRadius: 10, padding: '14px 16px', marginBottom: 20,
+                }}>
+                  <p style={{ fontSize: 13, color: C.red, margin: 0, lineHeight: 1.6 }}>
+                    {modal.org.billing_type !== 'manual_transfer'
+                      ? 'La suscripción en Stripe se cancelará al final del período ya pagado (cancel_at_period_end). El monitoreo se pausará inmediatamente.'
+                      : 'Se marcará el cliente como cancelado y se pausará el monitoreo. Sin acciones en Stripe.'}
+                  </p>
+                </div>
+                <div style={{ marginBottom: 20 }}>
+                  {fieldLabel('Escribí el nombre del cliente para confirmar')}
+                  <input
+                    value={modalInput}
+                    onChange={e => setModalInput(e.target.value)}
+                    placeholder={modal.org.name}
+                    style={{
+                      width: '100%', boxSizing: 'border-box', height: 44,
+                      background: C.input, border: `1px solid ${C.inputBdr}`,
+                      borderRadius: 10, padding: '0 14px',
+                      color: C.t1, fontSize: 14, fontFamily: C.body, outline: 'none',
+                    }}
+                  />
+                </div>
+                {modalError && <div style={{ color: C.red, fontSize: 13, marginBottom: 12 }}>{modalError}</div>}
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  {cancelBtn}
+                  <button
+                    onClick={() => execAction(modal.org.id, 'cancel')}
+                    disabled={modalLoading || modalInput !== modal.org.name}
+                    style={{
+                      fontFamily: C.title, fontWeight: 700, fontSize: 14,
+                      color: '#fff', background: 'linear-gradient(135deg,#d63060,#b02050)',
+                      border: 'none', padding: '10px 20px', borderRadius: 9,
+                      cursor: (modalLoading || modalInput !== modal.org.name) ? 'not-allowed' : 'pointer',
+                      opacity: (modalLoading || modalInput !== modal.org.name) ? .45 : 1,
+                    }}
+                  >
+                    {modalLoading ? 'Ejecutando...' : 'Dar de baja definitivamente'}
+                  </button>
+                </div>
+              </>)}
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

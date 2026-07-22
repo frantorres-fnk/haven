@@ -266,8 +266,9 @@ export default function Dashboard() {
   const [scanning, setScanning] = useState(false)
   const [checkingOut, setCheckingOut] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
-  const navigate      = useNavigate()
+  const navigate       = useNavigate()
   const [searchParams] = useSearchParams()
+  const adminView      = searchParams.get('admin_view') === '1'
 
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768)
@@ -370,7 +371,7 @@ export default function Dashboard() {
   const grade        = scoreGrade(score)
   const gradeNext    = nextGrade(score)
   const col          = scoreColors(score)
-  const isTrial      = org?.status === 'trialing'
+  const isTrial      = org?.status === 'trialing' && org?.billing_type !== 'manual_transfer'
   const trialDays    = daysLeft(org?.trial_ends_at)
   const CIRC_COMP    = 2 * Math.PI * 33
 
@@ -394,10 +395,41 @@ export default function Dashboard() {
       fontFamily: C.body,
     }}>
 
+      {/* ADMIN VIEW BANNER */}
+      {adminView && (
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 30,
+          background: 'rgba(91,110,245,.92)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 20px', height: 40,
+        }}>
+          <span style={{
+            fontFamily: C.mono, fontSize: 11, color: 'rgba(255,255,255,.8)',
+            letterSpacing: '.1em', textTransform: 'uppercase',
+          }}>
+            Vista de cliente · Solo lectura
+          </span>
+          <button
+            onClick={() => navigate('/admin')}
+            style={{
+              fontFamily: C.title, fontWeight: 600, fontSize: 12,
+              color: '#fff', background: 'rgba(255,255,255,.15)',
+              border: '1px solid rgba(255,255,255,.3)',
+              padding: '5px 12px', borderRadius: 7, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 5,
+            }}
+          >
+            ← Volver a Admin
+          </button>
+        </div>
+      )}
+
       {/* HEADER */}
       <header style={{
         borderBottom: `1px solid ${C.border}`,
-        position: 'sticky', top: 0, zIndex: 20,
+        position: 'sticky', top: adminView ? 40 : 0, zIndex: 20,
         background: 'rgba(8,11,18,.88)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',

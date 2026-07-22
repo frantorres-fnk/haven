@@ -359,7 +359,11 @@ export default function Admin() {
       }
       setModal(null)
       setModalInput('')
-      await loadOrgs()
+      try {
+        await loadOrgs()
+      } catch (e) {
+        alert('La acción se ejecutó correctamente, pero no se pudo refrescar la lista: ' + e.message + '\nRecargá la página para ver los cambios.')
+      }
     } catch (e) {
       setModalError('Error de red: ' + e.message)
     }

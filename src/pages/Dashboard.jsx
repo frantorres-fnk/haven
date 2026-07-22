@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { fetchCompletedScans, fetchOpenFindings } from '../lib/domainStats'
+import { fetchCompletedScans, fetchOpenFindings, fetchScanHistory } from '../lib/domainStats'
 import Wordmark from '../components/Wordmark'
+import ScoreEvolution from '../components/ScoreEvolution'
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -264,6 +265,7 @@ export default function Dashboard() {
   const [view, setView]         = useState('owner')
   const [loading, setLoading]   = useState(true)
   const [scanning, setScanning] = useState(false)
+  const [scanHistory, setScanHistory] = useState([])
   const [checkingOut, setCheckingOut] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const navigate       = useNavigate()
@@ -299,7 +301,11 @@ export default function Dashboard() {
   }
 
   async function loadLatestScan(domain_id) {
-    const scans = await fetchCompletedScans(domain_id, 10)
+    const [scans, history] = await Promise.all([
+      fetchCompletedScans(domain_id, 10),
+      fetchScanHistory(domain_id),
+    ])
+    setScanHistory(history)
 
     if (!scans.length) {
       setScan(null); setPrevScan(null); setFindings([]); return
@@ -749,6 +755,8 @@ export default function Dashboard() {
                   </div>
                 </section>
               )}
+
+              <ScoreEvolution scanHistory={scanHistory} isMobile={isMobile} />
 
               {/* SUPERFICIE MONITOREADA */}
               <section style={{ marginBottom: 32 }}>

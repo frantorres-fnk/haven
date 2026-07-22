@@ -42,6 +42,26 @@ export async function fetchCompletedScans(domainId, limit = 10) {
 }
 
 /**
+ * Retorna hasta 5000 scans completados de los últimos 90 días para el gráfico
+ * de evolución, ordenados ASC. En el cliente se agrega a 1 por día.
+ * Con cron cada 5 min, 5000 filas cubre ~17 días; para cobertura completa de
+ * 90 días agregar un RPC de agregación diaria en Supabase.
+ */
+export async function fetchScanHistory(domainId) {
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - 90)
+  const { data } = await supabase
+    .from('scans')
+    .select('id, score, completed_at, triggered_by')
+    .eq('domain_id', domainId)
+    .eq('status', 'completed')
+    .gte('completed_at', cutoff.toISOString())
+    .order('completed_at', { ascending: false })
+    .limit(5000)
+  return (data ?? []).reverse()
+}
+
+/**
  * Retorna los hallazgos abiertos de un scan específico (todos los campos).
  * Usada por Dashboard.jsx para mostrar el detalle de findings.
  */

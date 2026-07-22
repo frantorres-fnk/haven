@@ -213,6 +213,7 @@ export default function Admin() {
   const [error, setError]             = useState('')
   const [stats, setStats]             = useState({ total: 0, active: 0, trialing: 0, cancelled: 0, mrr: 0 })
   const [expandedOrgs,    setExpandedOrgs]    = useState({})
+  const [findingsPanel,   setFindingsPanel]   = useState({})
   const [modal,           setModal]           = useState(null)
   const [modalInput,      setModalInput]      = useState('')
   const [modalLoading,    setModalLoading]    = useState(false)
@@ -283,7 +284,12 @@ export default function Admin() {
       const lastScan      = primaryDomain
         ? data.scans.find(s => s.domain_id === primaryDomain.id)
         : null
-      return { ...org, domains: orgDomains, primaryDomain, lastScore: lastScan?.score || null }
+      const domainsWithData = orgDomains.map(d => {
+        const domainScan     = data.scans.find(s => s.domain_id === d.id) || null
+        const domainFindings = (data.findings || []).filter(f => f.domain_id === d.id)
+        return { ...d, lastScan: domainScan, findings: domainFindings }
+      })
+      return { ...org, domains: domainsWithData, primaryDomain, lastScore: lastScan?.score || null }
     })
 
     setOrgs(orgsWithData)
@@ -702,13 +708,15 @@ export default function Admin() {
 
                 return (
                   <div key={org.id} style={{
-                    display: 'grid',
-                    gridTemplateColumns: '56px 1fr auto',
-                    gap: 20, alignItems: 'center',
                     background: C.card, border: `1px solid ${C.border}`,
-                    borderRadius: 16, padding: '20px 24px',
-                    backdropFilter: 'blur(8px)',
+                    borderRadius: 16, backdropFilter: 'blur(8px)', overflow: 'hidden',
                   }}>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: '56px 1fr auto',
+                      gap: 20, alignItems: 'center',
+                      padding: '20px 24px',
+                    }}>
 
                     {/* Score ring */}
                     <MiniScoreRing score={org.lastScore} monitoring={monitoring} />
@@ -833,7 +841,7 @@ export default function Admin() {
                       return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
                           <button
-                            onClick={() => navigate(`/dashboard?domain=${org.primaryDomain?.id}&admin_view=1`)}
+                            onClick={() => setFindingsPanel(p => ({ ...p, [org.id]: !p[org.id] }))}
                             style={{
                               fontFamily: C.title, fontWeight: 600, fontSize: 13,
                               color: '#fff', background: C.accentBtn,
@@ -842,7 +850,7 @@ export default function Admin() {
                               boxShadow: '0 2px 10px rgba(91,110,245,.25)',
                             }}
                           >
-                            Ver portal →
+                            {findingsPanel[org.id] ? '▲ Ocultar hallazgos' : '▼ Ver hallazgos'}
                           </button>
 
                           <div style={{
@@ -873,6 +881,96 @@ export default function Admin() {
                         </div>
                       )
                     })()}
+                    </div>
+
+                    {findingsPanel[org.id] && (
+                      <div style={{ borderTop: `1px solid ${C.border}`, padding: '0 24px 20px' }}>
+                        {org.domains.map((d, di) => {
+                          const dCol = scoreColorAdmin(d.lastScan?.score)
+                          const SORDER = { critical: 0, high: 1, medium: 2, low: 3 }
+                          const sortedFindings = (d.findings || []).slice().sort(
+                            (a, b) => (SORDER[a.severity] ?? 9) - (SORDER[b.severity] ?? 9)
+                          )
+                          return (
+                            <div key={d.id} style={{
+                              paddingTop: 16, paddingBottom: 16,
+                              borderBottom: di < org.domains.length - 1 ? `1px solid ${C.border}` : 'none',
+                            }}>
+                              {/* Cabecera del dominio */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                                <span style={{
+                                  fontFamily: C.mono, fontSize: 9, fontWeight: 600,
+                                  padding: '2px 6px', borderRadius: 4, flexShrink: 0,
+                                  ...(d.is_primary
+                                    ? { color: C.link, background: 'rgba(91,110,245,.12)', border: '1px solid rgba(91,110,245,.25)' }
+                                    : { color: C.t3, background: 'rgba(130,150,220,.06)', border: `1px solid ${C.border}` }),
+                                }}>
+                                  {d.is_primary ? 'PRIMARY' : 'SUPPLIER'}
+                                </span>
+                                <span style={{ fontFamily: C.mono, fontSize: 13, color: C.t1, fontWeight: 700 }}>
+                                  {d.domain}
+                                </span>
+                                {d.lastScan?.score != null && (
+                                  <>
+                                    <span style={{ fontFamily: C.title, fontSize: 13, fontWeight: 700, color: dCol }}>
+                                      {d.lastScan.score}
+                                    </span>
+                                    <span style={{ fontFamily: C.mono, fontSize: 10, color: dCol }}>
+                                      {scoreGradeAdmin(d.lastScan.score)}
+                                    </span>
+                                  </>
+                                )}
+                                {!d.lastScan && (
+                                  <span style={{ fontFamily: C.mono, fontSize: 11, color: C.t3 }}>Sin scan</span>
+                                )}
+                              </div>
+
+                              {/* Hallazgos */}
+                              {sortedFindings.length === 0 ? (
+                                <p style={{ fontFamily: C.body, fontSize: 12, color: C.t3, margin: 0 }}>
+                                  {d.lastScan ? 'Sin hallazgos abiertos en el último scan' : 'Sin datos de scan disponibles'}
+                                </p>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                  {sortedFindings.map((f, fi) => {
+                                    const sCol = (f.severity === 'critical' || f.severity === 'high') ? C.red : f.severity === 'medium' ? C.amber : C.t3
+                                    const sBg  = (f.severity === 'critical' || f.severity === 'high') ? 'rgba(242,99,126,.1)' : f.severity === 'medium' ? 'rgba(245,181,68,.1)' : 'rgba(130,150,220,.06)'
+                                    return (
+                                      <div key={fi} style={{
+                                        display: 'grid', gridTemplateColumns: '76px 110px 1fr',
+                                        gap: 10, alignItems: 'start',
+                                        background: 'rgba(130,150,220,.03)', border: `1px solid ${C.border}`,
+                                        borderRadius: 8, padding: '8px 12px',
+                                      }}>
+                                        <span style={{
+                                          fontFamily: C.mono, fontSize: 9, fontWeight: 700,
+                                          color: sCol, background: sBg, border: `1px solid ${sCol}40`,
+                                          padding: '2px 5px', borderRadius: 4,
+                                          textTransform: 'uppercase', letterSpacing: '.05em', whiteSpace: 'nowrap',
+                                        }}>
+                                          {f.severity}
+                                        </span>
+                                        <span style={{ fontFamily: C.mono, fontSize: 10, color: C.t3, paddingTop: 2, wordBreak: 'break-all' }}>
+                                          {f.category}
+                                        </span>
+                                        <div>
+                                          <div style={{ fontFamily: C.mono, fontSize: 11, color: C.t1, marginBottom: 3, lineHeight: 1.4 }}>
+                                            {f.title_tech}
+                                          </div>
+                                          <div style={{ fontFamily: C.body, fontSize: 11, color: C.t3, lineHeight: 1.4 }}>
+                                            {f.action_tech}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 )
               })}

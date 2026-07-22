@@ -42,15 +42,21 @@ export async function fetchCompletedScans(domainId, limit = 10) {
 }
 
 /**
- * Retorna hasta 5000 scans completados de los últimos 90 días para el gráfico
- * de evolución, ordenados ASC. En el cliente se agrega a 1 por día.
- * Con cron cada 5 min, 5000 filas cubre ~17 días; para cobertura completa de
- * 90 días agregar un RPC de agregación diaria en Supabase.
+ * Retorna hasta 5000 scans completados para el gráfico de evolución, ordenados ASC.
+ *
+ * Sin parámetros: trae los últimos 90 días (comportamiento original).
+ * Con { fromDate }: usa esa fecha como cutoff en lugar de los 90 días fijos.
+ * Con { toDate }: agrega un filtro de fecha máxima.
+ * Ambos parámetros aceptan Date o string ISO.
  */
-export async function fetchScanHistory(domainId) {
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - 90)
-  const { data } = await supabase
+export async function fetchScanHistory(domainId, { fromDate, toDate } = {}) {
+  const cutoff = fromDate instanceof Date
+    ? fromDate
+    : fromDate
+      ? new Date(fromDate)
+      : (() => { const d = new Date(); d.setDate(d.getDate() - 90); return d })()
+
+  let query = supabase
     .from('scans')
     .select('id, score, completed_at, triggered_by')
     .eq('domain_id', domainId)
@@ -58,6 +64,13 @@ export async function fetchScanHistory(domainId) {
     .gte('completed_at', cutoff.toISOString())
     .order('completed_at', { ascending: false })
     .limit(5000)
+
+  if (toDate) {
+    const to = toDate instanceof Date ? toDate : new Date(toDate)
+    query = query.lte('completed_at', to.toISOString())
+  }
+
+  const { data } = await query
   return (data ?? []).reverse()
 }
 

@@ -756,7 +756,7 @@ export default function Dashboard() {
                 </section>
               )}
 
-              <ScoreEvolution scanHistory={scanHistory} isMobile={isMobile} />
+              <ScoreEvolution scanHistory={scanHistory} isMobile={isMobile} domainId={domain?.id} />
 
               {/* SUPERFICIE MONITOREADA */}
               <section style={{ marginBottom: 32 }}>

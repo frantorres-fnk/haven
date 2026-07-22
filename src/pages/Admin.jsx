@@ -862,12 +862,12 @@ export default function Admin() {
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                             {btnSm(
                               isPaused ? '▶ Reanudar' : '⏸ Pausar',
-                              () => setModal({ type: isPaused ? 'resume' : 'pause', org })
+                              () => { setModalError(''); setModal({ type: isPaused ? 'resume' : 'pause', org }) }
                             )}
-                            {btnSm('Plan', () => { setSelectedPlan(org.plan || 'advanced'); setModal({ type: 'change-plan', org }) })}
+                            {btnSm('Plan', () => { setModalError(''); setSelectedPlan(org.plan || 'advanced'); setModal({ type: 'change-plan', org }) })}
                           </div>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                            {btnSm('Facturación', () => { setSelectedBilling(org.billing_type || 'stripe'); setModal({ type: 'billing-type', org }) })}
+                            {btnSm('Facturación', () => { setModalError(''); setSelectedBilling(org.billing_type || 'stripe'); setModal({ type: 'billing-type', org }) })}
                             {btnSm('Dar de baja', () => { setModalInput(''); setModal({ type: 'cancel', org }) }, true)}
                           </div>
                         </div>

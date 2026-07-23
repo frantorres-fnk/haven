@@ -6,6 +6,7 @@ import Verify from './pages/Verify'
 import Domains from './pages/Domains'
 import ResetPassword from './pages/ResetPassword'
 import Admin from './pages/Admin'
+import AcceptInvite from './pages/AcceptInvite'
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
         <Route path="/domains" element={<Domains />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/accept-invite" element={<AcceptInvite />} />
       </Routes>
     </BrowserRouter>
   )

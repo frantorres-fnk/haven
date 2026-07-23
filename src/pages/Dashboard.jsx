@@ -5,6 +5,8 @@ import { fetchCompletedScans, fetchOpenFindings, fetchScanHistory } from '../lib
 import Wordmark from '../components/Wordmark'
 import ScoreEvolution from '../components/ScoreEvolution'
 
+const SCANNER_URL_BASE = import.meta.env.VITE_SCANNER_URL || 'https://scanner.franzthorres.workers.dev'
+
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const C = {
   bg:          '#080b12',
@@ -174,6 +176,10 @@ function Icon({ name, size = 16, color = 'currentColor', sw = 1.5 }) {
     info:           <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
     check:          <><polyline points="20 6 9 17 4 12"/></>,
     'x-mark':       <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+    users:          <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
+    'user-plus':    <><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></>,
+    'user-x':       <><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="18" y1="8" x2="23" y2="13"/><line x1="23" y1="8" x2="18" y2="13"/></>,
+    send:           <><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></>,
     'arrow-up':     <><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></>,
     'arrow-right':  <><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></>,
     'trending-up':  <><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></>,
@@ -254,10 +260,12 @@ function StatusBadge({ status }) {
 }
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────────
-const SCANNER_URL = import.meta.env.VITE_SCANNER_URL || 'https://scanner.franzthorres.workers.dev'
+const SCANNER_URL = SCANNER_URL_BASE
 
 export default function Dashboard() {
   const [org, setOrg]           = useState(null)
+  const [orgId, setOrgId]       = useState(null)
+  const [orgRole, setOrgRole]   = useState(null)   // 'owner' | 'admin' | 'viewer'
   const [domain, setDomain]     = useState(null)
   const [scan, setScan]         = useState(null)
   const [prevScan, setPrevScan] = useState(null)
@@ -268,6 +276,13 @@ export default function Dashboard() {
   const [scanHistory, setScanHistory] = useState([])
   const [checkingOut, setCheckingOut] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  // Equipo (sólo owner)
+  const [members, setMembers]       = useState([])
+  const [invites, setInvites]       = useState([])
+  const [inviteForm, setInviteForm] = useState({ email: '', role: 'viewer' })
+  const [inviting, setInviting]     = useState(false)
+  const [inviteMsg, setInviteMsg]   = useState(null)
+  const [removingId, setRemovingId] = useState(null)
   const navigate       = useNavigate()
   const [searchParams] = useSearchParams()
   const adminView      = searchParams.get('admin_view') === '1'
@@ -290,14 +305,81 @@ export default function Dashboard() {
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { navigate('/login'); return }
-    const { data: orgData } = await supabase.from('organizations').select('*').eq('id', user.id).single()
+
+    // Resolver membresía: auth.uid() → org_id + role
+    const { data: membership } = await supabase
+      .from('org_members')
+      .select('org_id, role')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!membership) { navigate('/login'); return }
+    setOrgId(membership.org_id)
+    setOrgRole(membership.role)
+
+    const { data: orgData } = await supabase
+      .from('organizations').select('*').eq('id', membership.org_id).single()
     if (orgData) setOrg(orgData)
+
     const domainId = searchParams.get('domain')
-    let q = supabase.from('domains').select('*').eq('org_id', user.id)
+    let q = supabase.from('domains').select('*').eq('org_id', membership.org_id)
     q = domainId ? q.eq('id', domainId) : q.eq('is_primary', true)
     const { data: domainData } = await q.single()
-    if (domainData) { setDomain(domainData); await loadLatestScan(domainData.id, user.id) }
+    if (domainData) { setDomain(domainData); await loadLatestScan(domainData.id) }
+
+    if (membership.role === 'owner') await loadTeam(membership.org_id)
+
     setLoading(false)
+  }
+
+  async function loadTeam(currentOrgId) {
+    const id = currentOrgId ?? orgId
+    if (!id) return
+    const [{ data: membersData }, { data: invitesData }] = await Promise.all([
+      supabase.from('org_members').select('id, user_id, email, role, created_at').eq('org_id', id),
+      supabase.from('org_invites').select('id, email, role, status, expires_at, created_at').eq('org_id', id).eq('status', 'pending'),
+    ])
+    if (membersData) setMembers(membersData)
+    if (invitesData) setInvites(invitesData)
+  }
+
+  async function handleInvite(e) {
+    e.preventDefault()
+    if (!inviteForm.email || !org) return
+    setInviting(true)
+    setInviteMsg(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${SCANNER_URL}/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ org_id: org.id, email: inviteForm.email, role: inviteForm.role }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setInviteMsg({ type: 'ok', text: `Invitación enviada a ${inviteForm.email}` })
+        setInviteForm({ email: '', role: 'viewer' })
+        await loadTeam()
+      } else {
+        setInviteMsg({ type: 'err', text: data.error || 'No se pudo enviar la invitación.' })
+      }
+    } catch {
+      setInviteMsg({ type: 'err', text: 'Error de red al enviar la invitación.' })
+    }
+    setInviting(false)
+  }
+
+  async function handleRemoveMember(memberId) {
+    if (!confirm('¿Eliminar este miembro del equipo?')) return
+    setRemovingId(memberId)
+    await supabase.from('org_members').delete().eq('id', memberId)
+    await loadTeam()
+    setRemovingId(null)
+  }
+
+  async function handleCancelInvite(inviteId) {
+    await supabase.from('org_invites').update({ status: 'expired' }).eq('id', inviteId)
+    await loadTeam()
   }
 
   async function loadLatestScan(domain_id) {
@@ -496,14 +578,16 @@ export default function Dashboard() {
               ))}
             </div>
 
-            <button onClick={runScan} disabled={scanning} style={{
-              fontFamily: C.title, fontWeight: 600, fontSize: isMobile ? 12 : 13,
-              color: '#fff', background: scanning ? 'rgba(91,110,245,.5)' : C.accentGrad,
-              border: 'none', padding: isMobile ? '6px 10px' : '7px 14px',
-              borderRadius: 8, cursor: scanning ? 'not-allowed' : 'pointer',
-            }}>
-              {scanning ? 'Analizando…' : 'Analizar ahora'}
-            </button>
+            {orgRole !== 'viewer' && (
+              <button onClick={runScan} disabled={scanning} style={{
+                fontFamily: C.title, fontWeight: 600, fontSize: isMobile ? 12 : 13,
+                color: '#fff', background: scanning ? 'rgba(91,110,245,.5)' : C.accentGrad,
+                border: 'none', padding: isMobile ? '6px 10px' : '7px 14px',
+                borderRadius: 8, cursor: scanning ? 'not-allowed' : 'pointer',
+              }}>
+                {scanning ? 'Analizando…' : 'Analizar ahora'}
+              </button>
+            )}
 
             {!isMobile && (
               <button onClick={handleLogout} style={{
@@ -521,7 +605,7 @@ export default function Dashboard() {
       <main style={{ padding: '28px 0 72px' }}>
         <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 20px' }}>
 
-          {/* TRIAL BANNER */}
+          {/* TRIAL BANNER — solo owner ve el botón de activación */}
           {isTrial && (
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
@@ -537,13 +621,15 @@ export default function Dashboard() {
                     : '· Tu prueba venció. Activá la suscripción para continuar el monitoreo.'}
                 </span>
               </div>
-              <button onClick={handleCheckout} disabled={checkingOut} style={{
-                fontFamily: C.title, fontWeight: 700, fontSize: 13,
-                color: '#0d1526', background: C.amber, border: 'none',
-                padding: '9px 16px', borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap',
-              }}>
-                {checkingOut ? 'Redirigiendo…' : 'Activar suscripción →'}
-              </button>
+              {orgRole === 'owner' && (
+                <button onClick={handleCheckout} disabled={checkingOut} style={{
+                  fontFamily: C.title, fontWeight: 700, fontSize: 13,
+                  color: '#0d1526', background: C.amber, border: 'none',
+                  padding: '9px 16px', borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap',
+                }}>
+                  {checkingOut ? 'Redirigiendo…' : 'Activar suscripción →'}
+                </button>
+              )}
             </div>
           )}
 
@@ -949,6 +1035,238 @@ export default function Dashboard() {
                   </div>
                 </div>
               </section>
+
+              {/* ═══ EQUIPO — sólo visible para owner ══════════════════════════ */}
+              {orgRole === 'owner' && (
+                <section style={{ marginBottom: 32 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                    <Icon name="users" size={16} color={C.link} />
+                    <h2 style={{ fontFamily: C.title, fontWeight: 700, fontSize: 16, color: C.t1 }}>
+                      Equipo
+                    </h2>
+                    <span style={{
+                      fontFamily: C.mono, fontSize: 11, color: C.link,
+                      background: 'rgba(91,110,245,.1)', border: '1px solid rgba(91,110,245,.22)',
+                      padding: '2px 8px', borderRadius: 20,
+                    }}>
+                      {members.length} miembro{members.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+
+                  <div style={{
+                    background: `linear-gradient(160deg, rgba(20,27,46,.5) 0%, rgba(8,11,18,.2) 100%)`,
+                    border: `1px solid ${C.border}`, borderRadius: 18,
+                    padding: isMobile ? '20px 16px' : '28px 30px',
+                  }}>
+
+                    {/* Lista de miembros */}
+                    {members.length > 0 && (
+                      <div style={{ marginBottom: 24 }}>
+                        <div style={{
+                          fontFamily: C.mono, fontSize: 10, color: C.t3, letterSpacing: '.12em',
+                          textTransform: 'uppercase', marginBottom: 12,
+                        }}>Miembros activos</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {members.map(m => {
+                            const roleColors = {
+                              owner: { bg: 'rgba(91,110,245,.12)', color: C.link, border: 'rgba(91,110,245,.25)', label: 'Propietario' },
+                              admin: { bg: 'rgba(61,220,132,.1)',  color: C.greenText, border: 'rgba(61,220,132,.25)', label: 'Admin' },
+                              viewer: { bg: 'rgba(130,150,220,.08)', color: C.t2, border: 'rgba(130,150,220,.2)', label: 'Viewer' },
+                            }[m.role] ?? { bg: 'rgba(130,150,220,.08)', color: C.t2, border: 'rgba(130,150,220,.2)', label: m.role }
+                            const isMe = m.role === 'owner'
+                            return (
+                              <div key={m.id} style={{
+                                display: 'flex', alignItems: 'center', gap: 14,
+                                padding: '11px 14px',
+                                background: C.card, border: `1px solid ${C.border}`,
+                                borderRadius: 10,
+                              }}>
+                                <div style={{
+                                  width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                                  background: roleColors.bg, display: 'grid', placeItems: 'center',
+                                }}>
+                                  <Icon name="users" size={14} color={roleColors.color} />
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{
+                                    fontSize: 13, fontWeight: 600, color: C.t1,
+                                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                  }}>
+                                    {m.email ?? `uid:${m.user_id.slice(0,8)}…`}
+                                    {isMe && <span style={{ fontSize: 11, color: C.t3, fontWeight: 400, marginLeft: 6 }}>· tú</span>}
+                                  </div>
+                                  <div style={{ fontFamily: C.mono, fontSize: 11, color: C.t3, marginTop: 2 }}>
+                                    {m.created_at ? `Desde ${new Date(m.created_at).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
+                                  </div>
+                                </div>
+                                <span style={{
+                                  fontFamily: C.mono, fontSize: 11, fontWeight: 600,
+                                  padding: '3px 10px', borderRadius: 20,
+                                  background: roleColors.bg, color: roleColors.color,
+                                  border: `1px solid ${roleColors.border}`,
+                                }}>
+                                  {roleColors.label}
+                                </span>
+                                {!isMe && (
+                                  <button
+                                    onClick={() => handleRemoveMember(m.id)}
+                                    disabled={removingId === m.id}
+                                    style={{
+                                      display: 'flex', alignItems: 'center', gap: 4,
+                                      fontFamily: C.body, fontSize: 12, color: C.t3,
+                                      background: 'none', border: 'none', cursor: 'pointer',
+                                      padding: '4px 6px', borderRadius: 6, transition: 'color .15s',
+                                      opacity: removingId === m.id ? .5 : 1,
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.color = C.red}
+                                    onMouseLeave={e => e.currentTarget.style.color = C.t3}
+                                    title="Eliminar miembro"
+                                  >
+                                    <Icon name="user-x" size={13} color="currentColor" />
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Invitaciones pendientes */}
+                    {invites.length > 0 && (
+                      <div style={{ marginBottom: 24 }}>
+                        <div style={{
+                          fontFamily: C.mono, fontSize: 10, color: C.t3, letterSpacing: '.12em',
+                          textTransform: 'uppercase', marginBottom: 12,
+                        }}>Invitaciones pendientes</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {invites.map(inv => (
+                            <div key={inv.id} style={{
+                              display: 'flex', alignItems: 'center', gap: 14,
+                              padding: '10px 14px',
+                              background: 'rgba(245,181,68,.05)', border: '1px solid rgba(245,181,68,.2)',
+                              borderRadius: 10,
+                            }}>
+                              <Icon name="mail" size={14} color={C.amberText} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, color: C.t1, fontWeight: 500 }}>{inv.email}</div>
+                                <div style={{ fontFamily: C.mono, fontSize: 11, color: C.t3, marginTop: 2 }}>
+                                  Expira {new Date(inv.expires_at).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
+                                </div>
+                              </div>
+                              <span style={{
+                                fontFamily: C.mono, fontSize: 11, color: C.amberText,
+                                background: 'rgba(245,181,68,.1)', border: '1px solid rgba(245,181,68,.25)',
+                                padding: '2px 8px', borderRadius: 20,
+                              }}>
+                                {inv.role}
+                              </span>
+                              <button
+                                onClick={() => handleCancelInvite(inv.id)}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 4,
+                                  fontFamily: C.body, fontSize: 12, color: C.t3,
+                                  background: 'none', border: 'none', cursor: 'pointer',
+                                  padding: '4px 6px', borderRadius: 6, transition: 'color .15s',
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.color = C.red}
+                                onMouseLeave={e => e.currentTarget.style.color = C.t3}
+                                title="Cancelar invitación"
+                              >
+                                <Icon name="x-mark" size={13} color="currentColor" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Formulario de invitación */}
+                    <div>
+                      <div style={{
+                        fontFamily: C.mono, fontSize: 10, color: C.t3, letterSpacing: '.12em',
+                        textTransform: 'uppercase', marginBottom: 12,
+                      }}>Invitar al equipo</div>
+                      <form onSubmit={handleInvite} style={{
+                        display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end',
+                      }}>
+                        <input
+                          type="email" required
+                          placeholder="nombre@empresa.com"
+                          value={inviteForm.email}
+                          onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))}
+                          style={{
+                            flex: '2 1 200px',
+                            background: C.bg, border: `1px solid ${C.border}`,
+                            borderRadius: 9, padding: '10px 14px',
+                            color: C.t1, fontSize: 14, fontFamily: C.body, outline: 'none',
+                          }}
+                        />
+                        <select
+                          value={inviteForm.role}
+                          onChange={e => setInviteForm(f => ({ ...f, role: e.target.value }))}
+                          style={{
+                            flex: '1 1 120px',
+                            background: C.bg, border: `1px solid ${C.border}`,
+                            borderRadius: 9, padding: '10px 14px',
+                            color: C.t1, fontSize: 14, fontFamily: C.body, outline: 'none',
+                          }}
+                        >
+                          <option value="viewer">Viewer</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                        <button
+                          type="submit" disabled={inviting}
+                          style={{
+                            flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6,
+                            fontFamily: C.title, fontWeight: 700, fontSize: 13,
+                            color: '#fff', background: inviting ? 'rgba(91,110,245,.5)' : C.accentGrad,
+                            border: 'none', padding: '10px 18px', borderRadius: 9,
+                            cursor: inviting ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          <Icon name="send" size={13} color="#fff" />
+                          {inviting ? 'Enviando…' : 'Invitar'}
+                        </button>
+                      </form>
+                      {inviteMsg && (
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 8, marginTop: 12,
+                          padding: '10px 14px', borderRadius: 9,
+                          background: inviteMsg.type === 'ok' ? 'rgba(61,220,132,.08)' : 'rgba(242,99,126,.08)',
+                          border: `1px solid ${inviteMsg.type === 'ok' ? 'rgba(61,220,132,.25)' : 'rgba(242,99,126,.25)'}`,
+                        }}>
+                          <Icon
+                            name={inviteMsg.type === 'ok' ? 'check' : 'x-mark'}
+                            size={14}
+                            color={inviteMsg.type === 'ok' ? C.greenText : C.red}
+                          />
+                          <span style={{
+                            fontSize: 13,
+                            color: inviteMsg.type === 'ok' ? C.greenText : C.red,
+                          }}>
+                            {inviteMsg.text}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Nota sobre roles */}
+                    <div style={{
+                      display: 'flex', gap: 10, alignItems: 'flex-start',
+                      marginTop: 20, padding: '12px 14px',
+                      background: 'rgba(91,110,245,.04)', border: `1px solid rgba(91,110,245,.15)`,
+                      borderRadius: 10,
+                    }}>
+                      <Icon name="info" size={14} color={C.link} sw={1.5} />
+                      <p style={{ fontSize: 12, color: C.t2, margin: 0, lineHeight: 1.6 }}>
+                        <b style={{ color: C.t1 }}>Admin</b> puede analizar dominios y ver hallazgos.{' '}
+                        <b style={{ color: C.t1 }}>Viewer</b> solo puede consultar el dashboard, sin acciones.
+                      </p>
+                    </div>
+                  </div>
+                </section>
+              )}
 
               {/* DATA LAW */}
               {dataLaw && (

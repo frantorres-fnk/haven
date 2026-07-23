@@ -267,24 +267,26 @@ function DomainCard({ d, onDetail, onScan, onDelete, scanning }) {
           <Icon name="arrow-right" size={13} color="#fff" />
         </button>
 
-        <button
-          onClick={onScan}
-          disabled={scanning}
-          style={{
-            fontFamily: C.title, fontWeight: 600, fontSize: 12,
-            color: C.link, background: 'rgba(91,110,245,.08)',
-            border: '1px solid rgba(91,110,245,.25)',
-            padding: '7px 14px', borderRadius: 9,
-            cursor: scanning ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
-            display: 'flex', alignItems: 'center', gap: 5,
-            opacity: scanning ? .6 : 1,
-          }}
-        >
-          <Icon name="refresh-cw" size={12} color={C.link} />
-          {scanning ? 'Analizando…' : 'Analizar'}
-        </button>
+        {!scanning && onScan && (
+          <button
+            onClick={onScan}
+            disabled={scanning}
+            style={{
+              fontFamily: C.title, fontWeight: 600, fontSize: 12,
+              color: C.link, background: 'rgba(91,110,245,.08)',
+              border: '1px solid rgba(91,110,245,.25)',
+              padding: '7px 14px', borderRadius: 9,
+              cursor: scanning ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
+              display: 'flex', alignItems: 'center', gap: 5,
+              opacity: scanning ? .6 : 1,
+            }}
+          >
+            <Icon name="refresh-cw" size={12} color={C.link} />
+            {scanning ? 'Analizando…' : 'Analizar'}
+          </button>
+        )}
 
-        {!isPrimary && (
+        {!isPrimary && onDelete && (
           <button
             onClick={onDelete}
             style={{
@@ -308,14 +310,15 @@ function DomainCard({ d, onDetail, onScan, onDelete, scanning }) {
 
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function Domains() {
-  const [org, setOrg]         = useState(null)
-  const [domains, setDomains] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [adding, setAdding]   = useState(false)
+  const [org, setOrg]           = useState(null)
+  const [orgRole, setOrgRole]   = useState(null)   // 'owner' | 'admin' | 'viewer'
+  const [domains, setDomains]   = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [adding, setAdding]     = useState(false)
   const [scanning, setScanning] = useState(null)
-  const [form, setForm]       = useState({ domain: '', label: '' })
-  const [error, setError]     = useState('')
-  const [focused, setFocused] = useState(null)
+  const [form, setForm]         = useState({ domain: '', label: '' })
+  const [error, setError]       = useState('')
+  const [focused, setFocused]   = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => { loadData() }, [])
@@ -324,12 +327,22 @@ export default function Domains() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { navigate('/login'); return }
 
+    // Resolver membresía: auth.uid() → org_id + role
+    const { data: membership } = await supabase
+      .from('org_members')
+      .select('org_id, role')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!membership) { navigate('/login'); return }
+    setOrgRole(membership.role)
+
     const { data: orgData } = await supabase
-      .from('organizations').select('*').eq('id', user.id).single()
+      .from('organizations').select('*').eq('id', membership.org_id).single()
     if (orgData) setOrg(orgData)
 
     const { data: domainsData } = await supabase
-      .from('domains').select('*').eq('org_id', user.id)
+      .from('domains').select('*').eq('org_id', membership.org_id)
       .order('created_at', { ascending: true })
 
     if (domainsData) {
@@ -525,15 +538,15 @@ export default function Domains() {
                 d={d}
                 scanning={scanning === d.id}
                 onDetail={() => navigate(`/dashboard?domain=${d.id}`)}
-                onScan={() => handleScan(d)}
-                onDelete={() => handleDelete(d)}
+                onScan={orgRole !== 'viewer' ? () => handleScan(d) : null}
+                onDelete={orgRole !== 'viewer' ? () => handleDelete(d) : null}
               />
             ))}
           </div>
         )}
 
-        {/* ─── AGREGAR DOMINIO ──────────────────────────────────────────────── */}
-        {canAdd ? (
+        {/* ─── AGREGAR DOMINIO — sólo admin y owner ───────────────────────── */}
+        {orgRole !== 'viewer' && canAdd ? (
           <div style={{
             background: C.card,
             border: `1px dashed ${C.borderHi}`,
@@ -617,7 +630,7 @@ export default function Domains() {
               </div>
             )}
           </div>
-        ) : (
+        ) : orgRole !== 'viewer' ? (
           <div style={{
             background: 'rgba(91,110,245,.05)',
             border: `1px solid rgba(91,110,245,.2)`,
@@ -646,7 +659,7 @@ export default function Domains() {
               <Icon name="arrow-right" size={14} color="#fff" />
             </a>
           </div>
-        )}
+        ) : null}
       </main>
     </div>
   )

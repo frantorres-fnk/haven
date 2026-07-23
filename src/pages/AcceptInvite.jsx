@@ -51,7 +51,7 @@ export default function AcceptInvite() {
 
   const [step, setStep]           = useState('loading')   // loading | info | auth | accepting | done | error
   const [inviteInfo, setInviteInfo] = useState(null)       // { org_name, email, role, valid }
-  const [authMode, setAuthMode]   = useState('login')      // login | signup
+  const [authMode, setAuthMode]   = useState('signup')     // login | signup
   const [form, setForm]           = useState({ email: '', password: '' })
   const [authError, setAuthError] = useState(null)
   const [busy, setBusy]           = useState(false)

@@ -411,8 +411,9 @@ export default function Dashboard() {
     if (!domain || !org) return
     setScanning(true)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch(`${SCANNER_URL}/scan/dns`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ domain: domain.domain, org_id: org.id, domain_id: domain.id, org_name: org.name, org_email: org.email }),
       })
       const data = await res.json()
@@ -425,8 +426,9 @@ export default function Dashboard() {
     if (!org) return
     setCheckingOut(true)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch(`${SCANNER_URL}/create-checkout`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ org_id: org.id, email: org.email, plan: org.plan || 'advanced', domain: domain?.domain }),
       })
       const { url } = await res.json()

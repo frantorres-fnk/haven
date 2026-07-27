@@ -380,8 +380,9 @@ export default function Domains() {
       }).select().single()
     if (domainError) { setError('Error agregando el dominio.'); setAdding(false); return }
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       await fetch(`${SCANNER_URL}/scan/dns`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ domain: cleanDomain, org_id: org.id, domain_id: domainData.id }),
       })
     } catch { /* scan no bloqueante */ }
@@ -393,8 +394,9 @@ export default function Domains() {
   async function handleScan(d) {
     setScanning(d.id)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       await fetch(`${SCANNER_URL}/scan/dns`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ domain: d.domain, org_id: org.id, domain_id: d.id }),
       })
       await loadData()

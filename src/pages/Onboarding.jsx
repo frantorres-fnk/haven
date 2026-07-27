@@ -213,6 +213,14 @@ export default function Onboarding() {
     })
     if (orgError) { setError('Error creando la organización'); setLoading(false); return }
 
+    const { error: memberError } = await supabase.from('org_members').insert({
+      org_id: authData.user.id,
+      user_id: authData.user.id,
+      email: form.email,
+      role: 'owner',
+    })
+    if (memberError) { setError('Error configurando los permisos de acceso'); setLoading(false); return }
+
     const { data: domainData } = await supabase.from('domains').insert({
       org_id: authData.user.id,
       domain,
@@ -223,16 +231,11 @@ export default function Onboarding() {
 
     if (domainData) {
       try {
+        const { data: { session } } = await supabase.auth.getSession()
         await fetch(`${SCANNER_URL}/send-verification`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: form.email,
-            org_name: form.company,
-            domain,
-            domain_id: domainData.id,
-            verification_token: domainData.verification_token,
-          }),
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ domain_id: domainData.id }),
         })
       } catch (err) { console.error('Error mandando mail de verificación:', err) }
     }

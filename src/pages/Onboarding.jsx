@@ -227,6 +227,7 @@ export default function Onboarding() {
       verified: false,
       is_primary: true,
       monitoring_active: false,
+      verification_token_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     }).select().single()
 
     if (domainData) {

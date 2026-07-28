@@ -220,6 +220,7 @@ export default function Admin() {
   const [modalError,      setModalError]      = useState('')
   const [selectedPlan,    setSelectedPlan]    = useState('advanced')
   const [selectedBilling, setSelectedBilling] = useState('stripe')
+  const [testReport,      setTestReport]      = useState({})
 
   const [authEmail,    setAuthEmail]    = useState('')
   const [authPassword, setAuthPassword] = useState('')
@@ -334,6 +335,35 @@ export default function Admin() {
   async function handleLogout() {
     await supabase.auth.signOut()
     navigate('/login')
+  }
+
+  async function handleTestMonthlyReport(orgId) {
+    setTestReport(prev => ({ ...prev, [orgId]: { loading: true, ok: null, message: '' } }))
+    try {
+      const token = await getAuthToken()
+      const now    = new Date()
+      const pStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(),     1))
+      const pEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
+      const period_start = pStart.toISOString().slice(0, 10)
+      const period_end   = pEnd.toISOString().slice(0, 10)
+
+      const res  = await fetch(`${SCANNER_URL}/admin/test-monthly-report`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ org_id: orgId, period_start, period_end, force: true }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        const msg = data.skipped
+          ? `Sin datos para ${period_start}`
+          : `OK · ${data.alerts_count ?? '?'} alertas · ${data.recipients ?? '?'} dest.`
+        setTestReport(prev => ({ ...prev, [orgId]: { loading: false, ok: true, message: msg } }))
+      } else {
+        setTestReport(prev => ({ ...prev, [orgId]: { loading: false, ok: false, message: data.error || 'Error desconocido' } }))
+      }
+    } catch (e) {
+      setTestReport(prev => ({ ...prev, [orgId]: { loading: false, ok: false, message: 'Red: ' + e.message } }))
+    }
   }
 
   // ── Acciones sobre clientes ──────────────────────────────────────────────────
@@ -882,6 +912,33 @@ export default function Admin() {
                             {btnSm('Facturación', () => { setModalError(''); setSelectedBilling(org.billing_type || 'stripe'); setModal({ type: 'billing-type', org }) })}
                             {btnSm('Dar de baja', () => { setModalInput(''); setModal({ type: 'cancel', org }) }, true)}
                           </div>
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            <button
+                              onClick={() => handleTestMonthlyReport(org.id)}
+                              disabled={!!testReport[org.id]?.loading}
+                              style={{
+                                fontFamily: C.mono, fontSize: 10, fontWeight: 600,
+                                letterSpacing: '.05em', whiteSpace: 'nowrap',
+                                color: '#c4b5fd',
+                                background: 'rgba(196,181,253,.07)',
+                                border: '1px solid rgba(196,181,253,.2)',
+                                padding: '4px 10px', borderRadius: 7,
+                                cursor: testReport[org.id]?.loading ? 'not-allowed' : 'pointer',
+                                opacity: testReport[org.id]?.loading ? .6 : 1,
+                              }}
+                            >
+                              {testReport[org.id]?.loading ? '⏳ Enviando...' : '🧪 Test reporte'}
+                            </button>
+                          </div>
+                          {testReport[org.id] && !testReport[org.id].loading && (
+                            <div style={{
+                              maxWidth: 220, fontSize: 11, fontFamily: C.mono,
+                              textAlign: 'right', lineHeight: 1.4,
+                              color: testReport[org.id].ok ? C.greenText : C.red,
+                            }}>
+                              {testReport[org.id].message}
+                            </div>
+                          )}
                         </div>
                       )
                     })()}

@@ -356,7 +356,7 @@ export default function Admin() {
       if (data.ok) {
         const msg = data.skipped
           ? `Sin datos para ${period_start}`
-          : `OK · ${data.alerts_count ?? '?'} alertas · ${data.recipients ?? '?'} dest.`
+          : `OK · ${data.alerts_count ?? '?'} alertas · a: ${data.test_recipient}`
         setTestReport(prev => ({ ...prev, [orgId]: { loading: false, ok: true, message: msg } }))
       } else {
         setTestReport(prev => ({ ...prev, [orgId]: { loading: false, ok: false, message: data.error || 'Error desconocido' } }))

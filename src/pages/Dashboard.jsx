@@ -152,6 +152,14 @@ function timeSince(dateStr) {
   return `hace ${Math.floor(seconds / 86400)} días`
 }
 
+// Penalización extra por antigüedad (espeja la lógica de calculateScore en el worker)
+function agePenaltyPts(daysOpen) {
+  if (daysOpen >= 30) return 15
+  if (daysOpen >= 14) return 10
+  if (daysOpen >= 7)  return 5
+  return 0
+}
+
 function daysLeft(dateStr) {
   if (!dateStr) return 0
   return Math.max(0, Math.ceil((new Date(dateStr) - new Date()) / 86400000))
@@ -817,11 +825,28 @@ export default function Dashboard() {
                                 {view === 'owner' ? f.title_plain : f.title_tech}
                               </span>
                               <SevBadge sev={f.severity} />
-                              {f.first_seen_at && (
-                                <span style={{ fontFamily: C.mono, fontSize: 10, color: C.t3 }}>
-                                  {timeSince(f.first_seen_at)}
-                                </span>
-                              )}
+                              {f.days_open > 0 && (() => {
+                                const penalty = agePenaltyPts(f.days_open)
+                                return (
+                                  <span style={{
+                                    fontFamily: C.mono, fontSize: 10,
+                                    color: penalty > 0 ? C.amber : C.t3,
+                                    display: 'flex', alignItems: 'center', gap: 4,
+                                  }}>
+                                    Abierto hace {f.days_open} día{f.days_open !== 1 ? 's' : ''}
+                                    {penalty > 0 && (
+                                      <span style={{
+                                        background: 'rgba(245,181,68,.12)',
+                                        border: '1px solid rgba(245,181,68,.25)',
+                                        borderRadius: 4, padding: '1px 6px',
+                                        color: C.amber, fontSize: 10,
+                                      }}>
+                                        -{penalty} pts antigüedad
+                                      </span>
+                                    )}
+                                  </span>
+                                )
+                              })()}
                             </div>
 
                             <p style={{ fontSize: 13, color: C.t2, lineHeight: 1.6, marginBottom: 10 }}>

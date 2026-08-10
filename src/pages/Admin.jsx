@@ -929,6 +929,7 @@ export default function Admin() {
                               }}
                             >
                               {testReport[org.id]?.loading ? '⏳ Enviando...' : '🧪 Test reporte'}
+                              {!testReport[org.id]?.loading && <span style={{ fontSize: 9, opacity: .55, marginLeft: 5, fontWeight: 400, letterSpacing: 0 }}>solo a mí</span>}
                             </button>
                           </div>
                           {testReport[org.id] && !testReport[org.id].loading && (

@@ -291,6 +291,15 @@ export default function Dashboard() {
   const [inviting, setInviting]     = useState(false)
   const [inviteMsg, setInviteMsg]   = useState(null)
   const [removingId, setRemovingId] = useState(null)
+
+  // ─── Org config (personalización) ─────────────────────────────────────────
+  const [phrasesList,      setPhrasesList]      = useState([])
+  const [phraseInput,      setPhraseInput]      = useState('')
+  const [knownDomainsList, setKnownDomainsList] = useState([])
+  const [knownDomainInput, setKnownDomainInput] = useState('')
+  const [orgConfigSaving,  setOrgConfigSaving]  = useState(false)
+  const [orgConfigMsg,     setOrgConfigMsg]     = useState(null) // { type:'ok'|'err', text }
+
   const navigate       = useNavigate()
   const [searchParams] = useSearchParams()
   const adminView      = searchParams.get('admin_view') === '1'
@@ -327,7 +336,11 @@ export default function Dashboard() {
 
     const { data: orgData } = await supabase
       .from('organizations').select('*').eq('id', membership.org_id).single()
-    if (orgData) setOrg(orgData)
+    if (orgData) {
+      setOrg(orgData)
+      setPhrasesList(orgData.distinctive_phrases ?? [])
+      setKnownDomainsList(orgData.known_domains ?? [])
+    }
 
     const domainId = searchParams.get('domain')
     let q = supabase.from('domains').select('*').eq('org_id', membership.org_id)
@@ -388,6 +401,23 @@ export default function Dashboard() {
   async function handleCancelInvite(inviteId) {
     await supabase.from('org_invites').update({ status: 'expired' }).eq('id', inviteId)
     await loadTeam()
+  }
+
+  async function handleSaveOrgConfig() {
+    setOrgConfigSaving(true)
+    setOrgConfigMsg(null)
+    const { error } = await supabase
+      .from('organizations')
+      .update({ distinctive_phrases: phrasesList, known_domains: knownDomainsList })
+      .eq('id', org.id)
+    setOrgConfigSaving(false)
+    if (error) {
+      setOrgConfigMsg({ type: 'err', text: 'Error al guardar. Intentá de nuevo.' })
+    } else {
+      setOrg(o => ({ ...o, distinctive_phrases: phrasesList, known_domains: knownDomainsList }))
+      setOrgConfigMsg({ type: 'ok', text: 'Cambios guardados' })
+      setTimeout(() => setOrgConfigMsg(null), 3000)
+    }
   }
 
   async function loadLatestScan(domain_id) {
@@ -1291,6 +1321,183 @@ export default function Dashboard() {
                         <b style={{ color: C.t1 }}>Viewer</b> solo puede consultar el dashboard, sin acciones.
                       </p>
                     </div>
+                  </div>
+                </section>
+              )}
+
+              {/* PERSONALIZACIÓN DEL MONITOREO */}
+              {orgRole === 'owner' && (
+                <section style={{ marginBottom: 32 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                    <Icon name="shield" size={16} color={C.link} />
+                    <h2 style={{ fontFamily: C.title, fontWeight: 700, fontSize: 16, color: C.t1 }}>
+                      Personalización del monitoreo
+                    </h2>
+                  </div>
+
+                  <div style={{
+                    background: `linear-gradient(160deg, rgba(20,27,46,.5) 0%, rgba(8,11,18,.2) 100%)`,
+                    border: `1px solid ${C.border}`, borderRadius: 18,
+                    padding: isMobile ? '20px 16px' : '28px 30px',
+                    display: 'flex', flexDirection: 'column', gap: 28,
+                  }}>
+
+                    {[
+                      {
+                        label: 'Frases distintivas de tu marca',
+                        help: null,
+                        placeholder: 'Ej: tu teléfono de soporte, un slogan, un texto de tu web',
+                        list: phrasesList,
+                        setList: setPhrasesList,
+                        input: phraseInput,
+                        setInput: setPhraseInput,
+                        normalize: v => v.trim(),
+                        isDupe: (v, list) => list.map(x => x.toLowerCase()).includes(v.toLowerCase()),
+                      },
+                      {
+                        label: 'Dominios/proveedores conocidos',
+                        help: 'Estos dominios no generarán alertas de typosquatting ni de subdominios sospechosos.',
+                        placeholder: 'Ej: proveedor-externo.com',
+                        list: knownDomainsList,
+                        setList: setKnownDomainsList,
+                        input: knownDomainInput,
+                        setInput: setKnownDomainInput,
+                        normalize: v => v.trim().toLowerCase(),
+                        isDupe: (v, list) => list.map(x => x.toLowerCase()).includes(v.toLowerCase()),
+                      },
+                    ].map(({ label, help, placeholder, list, setList, input, setInput, normalize, isDupe }) => {
+                      const maxed = list.length >= 5
+                      const addItem = () => {
+                        const val = normalize(input)
+                        if (!val || isDupe(val, list) || maxed) return
+                        setList(l => [...l, val])
+                        setInput('')
+                      }
+                      return (
+                        <div key={label}>
+                          <div style={{
+                            fontFamily: C.mono, fontSize: 10, color: C.t3, letterSpacing: '.12em',
+                            textTransform: 'uppercase', marginBottom: 10,
+                          }}>{label}</div>
+
+                          {help && (
+                            <div style={{
+                              display: 'flex', gap: 8, alignItems: 'flex-start',
+                              marginBottom: 12, padding: '9px 12px',
+                              background: 'rgba(91,110,245,.04)', border: `1px solid rgba(91,110,245,.15)`,
+                              borderRadius: 8,
+                            }}>
+                              <Icon name="info" size={13} color={C.link} sw={1.5} />
+                              <span style={{ fontSize: 12, color: C.t2, lineHeight: 1.55 }}>{help}</span>
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                            <input
+                              value={input}
+                              disabled={maxed}
+                              placeholder={maxed ? 'Máximo 5 alcanzado' : placeholder}
+                              onChange={e => setInput(e.target.value)}
+                              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addItem())}
+                              style={{
+                                flex: 1,
+                                background: maxed ? 'rgba(20,27,46,.3)' : C.bg,
+                                border: `1px solid ${C.border}`,
+                                borderRadius: 9, padding: '9px 13px',
+                                color: maxed ? C.t3 : C.t1,
+                                fontSize: 13, fontFamily: C.body, outline: 'none',
+                                cursor: maxed ? 'not-allowed' : 'text',
+                              }}
+                            />
+                            <button
+                              disabled={maxed}
+                              onClick={addItem}
+                              style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                width: 36, height: 36, flexShrink: 0,
+                                background: maxed ? 'rgba(91,110,245,.15)' : C.accentGrad,
+                                border: 'none', borderRadius: 9,
+                                color: '#fff', fontSize: 20, lineHeight: 1,
+                                cursor: maxed ? 'not-allowed' : 'pointer',
+                                opacity: maxed ? .4 : 1,
+                              }}
+                              title="Agregar"
+                            >+</button>
+                          </div>
+
+                          {list.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                              {list.map((item, idx) => (
+                                <div key={idx} style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 7,
+                                  background: C.card, border: `1px solid ${C.border}`,
+                                  borderRadius: 8, padding: '5px 10px 5px 11px',
+                                }}>
+                                  <span style={{ fontSize: 13, color: C.t1, fontFamily: C.body }}>{item}</span>
+                                  <button
+                                    onClick={() => setList(l => l.filter((_, i) => i !== idx))}
+                                    style={{
+                                      display: 'flex', alignItems: 'center',
+                                      background: 'none', border: 'none',
+                                      color: C.t3, cursor: 'pointer', padding: '1px 2px', borderRadius: 4,
+                                      lineHeight: 1,
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.color = C.red}
+                                    onMouseLeave={e => e.currentTarget.style.color = C.t3}
+                                    title="Quitar"
+                                  >
+                                    <Icon name="x-mark" size={12} color="currentColor" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+
+                    {(() => {
+                      const dirty =
+                        JSON.stringify(phrasesList)      !== JSON.stringify(org?.distinctive_phrases ?? []) ||
+                        JSON.stringify(knownDomainsList) !== JSON.stringify(org?.known_domains ?? [])
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          <button
+                            onClick={handleSaveOrgConfig}
+                            disabled={!dirty || orgConfigSaving}
+                            style={{
+                              alignSelf: 'flex-start',
+                              fontFamily: C.title, fontWeight: 700, fontSize: 13,
+                              color: '#fff',
+                              background: (!dirty || orgConfigSaving) ? 'rgba(91,110,245,.35)' : C.accentGrad,
+                              border: 'none', padding: '10px 20px', borderRadius: 9,
+                              cursor: (!dirty || orgConfigSaving) ? 'not-allowed' : 'pointer',
+                              opacity: (!dirty || orgConfigSaving) ? .6 : 1,
+                            }}
+                          >
+                            {orgConfigSaving ? 'Guardando…' : 'Guardar cambios'}
+                          </button>
+                          {orgConfigMsg && (
+                            <div style={{
+                              display: 'flex', alignItems: 'center', gap: 8,
+                              padding: '9px 13px', borderRadius: 9, alignSelf: 'flex-start',
+                              background: orgConfigMsg.type === 'ok' ? 'rgba(61,220,132,.08)' : 'rgba(242,99,126,.08)',
+                              border: `1px solid ${orgConfigMsg.type === 'ok' ? 'rgba(61,220,132,.25)' : 'rgba(242,99,126,.25)'}`,
+                            }}>
+                              <Icon
+                                name={orgConfigMsg.type === 'ok' ? 'check' : 'x-mark'}
+                                size={13}
+                                color={orgConfigMsg.type === 'ok' ? C.greenText : C.red}
+                              />
+                              <span style={{ fontSize: 13, color: orgConfigMsg.type === 'ok' ? C.greenText : C.red }}>
+                                {orgConfigMsg.text}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
+
                   </div>
                 </section>
               )}

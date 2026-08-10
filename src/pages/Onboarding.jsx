@@ -233,6 +233,12 @@ export default function Onboarding() {
     if (domainData) {
       try {
         const { data: { session } } = await supabase.auth.getSession()
+        // Fire-and-forget: extrae brand hint del sitio en background, no bloquea el onboarding
+        fetch(`${SCANNER_URL}/extract-brand-hint`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ domain_id: domainData.id, domain, org_id: authData.user.id }),
+        }).catch(() => {})
         await fetch(`${SCANNER_URL}/send-verification`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },

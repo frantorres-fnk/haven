@@ -381,6 +381,12 @@ export default function Domains() {
     if (domainError) { setError('Error agregando el dominio.'); setAdding(false); return }
     try {
       const { data: { session } } = await supabase.auth.getSession()
+      // Fire-and-forget: extrae brand hint del sitio en background, no bloquea el alta
+      fetch(`${SCANNER_URL}/extract-brand-hint`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ domain_id: domainData.id, domain: cleanDomain, org_id: org.id }),
+      }).catch(() => {})
       await fetch(`${SCANNER_URL}/scan/dns`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ domain: cleanDomain, org_id: org.id, domain_id: domainData.id }),

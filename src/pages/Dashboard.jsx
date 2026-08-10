@@ -367,6 +367,63 @@ function RawDataBlock({ checkId, raw }) {
     {raw.sample && <KvRow label="URL de muestra" value={raw.sample} />}
   </>)
 
+  if (checkId === 'phishing_search') return (
+    <div>
+      {raw.query && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontFamily: C.mono, fontSize: 10, color: C.t3, letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 6 }}>Query enviada a Brave</div>
+          <div style={{
+            fontFamily: C.mono, fontSize: 12, color: '#f5c542',
+            background: 'rgba(8,11,18,.6)', border: `1px solid ${C.border}`,
+            borderRadius: 8, padding: '8px 12px', wordBreak: 'break-all', lineHeight: 1.6,
+          }}>{raw.query}</div>
+        </div>
+      )}
+      {raw.anchors?.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontFamily: C.mono, fontSize: 10, color: C.t3, letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 6 }}>Anchors usados</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+            {raw.anchors.map((a, i) => (
+              <span key={i} style={{
+                fontFamily: C.mono, fontSize: 12,
+                background: 'rgba(130,150,220,.08)', border: `1px solid rgba(130,150,220,.18)`,
+                color: C.t2, borderRadius: 6, padding: '3px 8px',
+              }}>{a}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      {raw.results?.length > 0 && (
+        <div>
+          <div style={{ fontFamily: C.mono, fontSize: 10, color: C.t3, letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 8 }}>
+            Resultados sospechosos ({raw.results.length})
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {raw.results.map((r, i) => (
+              <div key={i} style={{
+                background: 'rgba(8,11,18,.5)', border: `1px solid ${C.border}`,
+                borderRadius: 8, padding: '8px 12px',
+              }}>
+                <a
+                  href={r.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontFamily: C.mono, fontSize: 12, color: C.red, wordBreak: 'break-all', display: 'block', marginBottom: 3 }}
+                >{r.url}</a>
+                {r.title && (
+                  <div style={{ fontSize: 12, color: C.t1, marginBottom: 2 }}>{r.title}</div>
+                )}
+                {r.description && (
+                  <div style={{ fontSize: 11, color: C.t3, lineHeight: 1.5 }}>{r.description}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
   // Fallback genérico: pares clave-valor para cualquier shape no reconocido
   return (
     <div>

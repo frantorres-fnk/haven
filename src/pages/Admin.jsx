@@ -219,7 +219,8 @@ export default function Admin() {
   const [modalLoading,    setModalLoading]    = useState(false)
   const [modalError,      setModalError]      = useState('')
   const [selectedPlan,    setSelectedPlan]    = useState('advanced')
-  const [selectedBilling, setSelectedBilling] = useState('stripe')
+  const [selectedBilling,    setSelectedBilling]    = useState('stripe')
+  const [activateOnBilling, setActivateOnBilling] = useState(false)
   const [testReport,      setTestReport]      = useState({})
 
   const [authEmail,    setAuthEmail]    = useState('')
@@ -909,7 +910,7 @@ export default function Admin() {
                             {btnSm('Plan', () => { setModalError(''); setSelectedPlan(org.plan || 'advanced'); setModal({ type: 'change-plan', org }) })}
                           </div>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                            {btnSm('Facturación', () => { setModalError(''); setSelectedBilling(org.billing_type || 'stripe'); setModal({ type: 'billing-type', org }) })}
+                            {btnSm('Facturación', () => { setModalError(''); setSelectedBilling(org.billing_type || 'stripe'); setActivateOnBilling(false); setModal({ type: 'billing-type', org }) })}
                             {btnSm('Dar de baja', () => { setModalInput(''); setModalError(''); setModal({ type: 'cancel', org }) }, true)}
                           </div>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -1321,10 +1322,29 @@ export default function Admin() {
                     </label>
                   ))}
                 </div>
+                {selectedBilling === 'manual_transfer' && (
+                  <label style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '12px 14px', borderRadius: 10, marginBottom: 16, cursor: 'pointer',
+                    background: activateOnBilling ? 'rgba(52,199,89,.08)' : C.card,
+                    border: `1px solid ${activateOnBilling ? '#34c759' : C.border}`,
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={activateOnBilling}
+                      onChange={e => setActivateOnBilling(e.target.checked)}
+                      style={{ accentColor: '#34c759', width: 16, height: 16, cursor: 'pointer' }}
+                    />
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: C.t1, marginBottom: 2 }}>Activar cliente ahora</div>
+                      <div style={{ fontSize: 12, color: C.t3 }}>Marcar como activo (pago ya recibido)</div>
+                    </div>
+                  </label>
+                )}
                 {modalError && <div style={{ color: C.red, fontSize: 13, marginBottom: 12 }}>{modalError}</div>}
                 <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
                   {cancelBtn}
-                  {confirmBtn('Confirmar', () => execAction(modal.org.id, 'billing-type', { billing_type: selectedBilling }))}
+                  {confirmBtn('Confirmar', () => execAction(modal.org.id, 'billing-type', { billing_type: selectedBilling, activate: activateOnBilling }))}
                 </div>
               </>)}
 

@@ -11,6 +11,7 @@ export async function fetchLatestScanCard(domainId) {
     .select('id, score, completed_at, status')
     .eq('domain_id', domainId)
     .eq('status', 'completed')
+    .not('triggered_by', 'eq', 'phishing_cron')
     .order('completed_at', { ascending: false })
     .limit(1)
 
@@ -36,6 +37,7 @@ export async function fetchCompletedScans(domainId, limit = 10) {
     .select('*')
     .eq('domain_id', domainId)
     .eq('status', 'completed')
+    .not('triggered_by', 'eq', 'phishing_cron')
     .order('completed_at', { ascending: false })
     .limit(limit)
   return data ?? []
@@ -61,6 +63,7 @@ export async function fetchScanHistory(domainId, { fromDate, toDate } = {}) {
     .select('id, score, completed_at, triggered_by')
     .eq('domain_id', domainId)
     .eq('status', 'completed')
+    .not('triggered_by', 'eq', 'phishing_cron')
     .gte('completed_at', cutoff.toISOString())
     .order('completed_at', { ascending: false })
     .limit(5000)
@@ -78,11 +81,11 @@ export async function fetchScanHistory(domainId, { fromDate, toDate } = {}) {
  * Retorna los hallazgos abiertos de un scan específico (todos los campos).
  * Usada por Dashboard.jsx para mostrar el detalle de findings.
  */
-export async function fetchOpenFindings(scanId) {
+export async function fetchOpenFindings(domainId) {
   const { data } = await supabase
     .from('findings')
     .select('*')
-    .eq('scan_id', scanId)
+    .eq('domain_id', domainId)
     .eq('status', 'open')
     .order('severity', { ascending: true })
   return data ?? []

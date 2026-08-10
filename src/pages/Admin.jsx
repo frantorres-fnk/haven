@@ -222,6 +222,7 @@ export default function Admin() {
   const [selectedBilling,    setSelectedBilling]    = useState('stripe')
   const [activateOnBilling, setActivateOnBilling] = useState(false)
   const [testReport,      setTestReport]      = useState({})
+  const [testPhishing,    setTestPhishing]    = useState({})
 
   const [authEmail,    setAuthEmail]    = useState('')
   const [authPassword, setAuthPassword] = useState('')
@@ -364,6 +365,26 @@ export default function Admin() {
       }
     } catch (e) {
       setTestReport(prev => ({ ...prev, [orgId]: { loading: false, ok: false, message: 'Red: ' + e.message } }))
+    }
+  }
+
+  async function handleTestPhishing(domainId) {
+    setTestPhishing(prev => ({ ...prev, [domainId]: { loading: true, data: null, error: '' } }))
+    try {
+      const token = await getAuthToken()
+      const res = await fetch(`${SCANNER_URL}/admin/test-phishing-search`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain_id: domainId, dry_run: true }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setTestPhishing(prev => ({ ...prev, [domainId]: { loading: false, data, error: '' } }))
+      } else {
+        setTestPhishing(prev => ({ ...prev, [domainId]: { loading: false, data: null, error: data.error || 'Error desconocido' } }))
+      }
+    } catch (e) {
+      setTestPhishing(prev => ({ ...prev, [domainId]: { loading: false, data: null, error: 'Red: ' + e.message } }))
     }
   }
 
@@ -986,7 +1007,96 @@ export default function Admin() {
                                 {!d.lastScan && (
                                   <span style={{ fontFamily: C.mono, fontSize: 11, color: C.t3 }}>Sin scan</span>
                                 )}
+                                <button
+                                  onClick={() => handleTestPhishing(d.id)}
+                                  disabled={!!testPhishing[d.id]?.loading}
+                                  style={{
+                                    marginLeft: 'auto', flexShrink: 0,
+                                    fontFamily: C.mono, fontSize: 10, fontWeight: 600,
+                                    letterSpacing: '.04em', whiteSpace: 'nowrap',
+                                    color: '#fcd34d',
+                                    background: 'rgba(252,211,77,.07)',
+                                    border: '1px solid rgba(252,211,77,.2)',
+                                    padding: '3px 9px', borderRadius: 6,
+                                    cursor: testPhishing[d.id]?.loading ? 'not-allowed' : 'pointer',
+                                    opacity: testPhishing[d.id]?.loading ? .55 : 1,
+                                  }}
+                                >
+                                  {testPhishing[d.id]?.loading ? '⏳ Buscando...' : '🎯 Test phishing'}
+                                </button>
                               </div>
+
+                              {/* Resultado test phishing */}
+                              {testPhishing[d.id] && !testPhishing[d.id].loading && (
+                                <div style={{
+                                  marginBottom: 12,
+                                  background: 'rgba(252,211,77,.04)',
+                                  border: '1px solid rgba(252,211,77,.15)',
+                                  borderRadius: 8, padding: '10px 14px',
+                                }}>
+                                  {testPhishing[d.id].error ? (
+                                    <p style={{ margin: 0, fontFamily: C.mono, fontSize: 11, color: C.red }}>
+                                      ✗ {testPhishing[d.id].error}
+                                    </p>
+                                  ) : (() => {
+                                    const r = testPhishing[d.id].data
+                                    return (
+                                      <>
+                                        {/* Query */}
+                                        <div style={{ marginBottom: 8 }}>
+                                          <span style={{ fontFamily: C.mono, fontSize: 9, color: C.t3, textTransform: 'uppercase', letterSpacing: '.08em' }}>Query</span>
+                                          <div style={{
+                                            fontFamily: C.mono, fontSize: 10, color: '#fcd34d',
+                                            marginTop: 3, wordBreak: 'break-all', lineHeight: 1.5,
+                                            background: 'rgba(0,0,0,.25)', borderRadius: 5, padding: '5px 8px',
+                                          }}>
+                                            {r.query}
+                                          </div>
+                                        </div>
+                                        {/* Contadores */}
+                                        <div style={{ display: 'flex', gap: 16, marginBottom: r.filtered_results_count > 0 ? 8 : 0 }}>
+                                          <span style={{ fontFamily: C.mono, fontSize: 11, color: C.t2 }}>
+                                            Crudos: <b style={{ color: C.t1 }}>{r.raw_results_count}</b>
+                                          </span>
+                                          <span style={{ fontFamily: C.mono, fontSize: 11 }}>
+                                            Filtrados:{' '}
+                                            <b style={{ color: r.filtered_results_count > 0 ? C.red : C.greenText }}>
+                                              {r.filtered_results_count}
+                                            </b>
+                                          </span>
+                                          <span style={{ fontFamily: C.mono, fontSize: 11, color: r.would_create_finding ? C.red : C.greenText }}>
+                                            {r.would_create_finding ? '⚠ Crearía finding' : '✓ Limpio'}
+                                          </span>
+                                        </div>
+                                        {/* Resultados filtrados */}
+                                        {r.filtered_results_count > 0 && (
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                            {r.filtered_results.map((fr, fri) => (
+                                              <div key={fri} style={{
+                                                background: 'rgba(242,99,126,.07)',
+                                                border: '1px solid rgba(242,99,126,.18)',
+                                                borderRadius: 6, padding: '6px 10px',
+                                              }}>
+                                                <a
+                                                  href={fr.url} target="_blank" rel="noopener noreferrer"
+                                                  style={{ fontFamily: C.mono, fontSize: 10, color: C.link, wordBreak: 'break-all', display: 'block', marginBottom: fr.title ? 2 : 0 }}
+                                                >
+                                                  {fr.url}
+                                                </a>
+                                                {fr.title && (
+                                                  <div style={{ fontFamily: C.body, fontSize: 11, color: C.t2, lineHeight: 1.4 }}>
+                                                    {fr.title}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </>
+                                    )
+                                  })()}
+                                </div>
+                              )}
 
                               {/* Hallazgos */}
                               {sortedFindings.length === 0 ? (

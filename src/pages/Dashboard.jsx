@@ -690,7 +690,7 @@ export default function Dashboard() {
     const prevAny    = rest[0] ?? null
     setPrevScan(current.triggered_by === 'manual' ? (prevManual ?? prevAny) : prevAny)
 
-    setFindings(await fetchOpenFindings(current.id))
+    setFindings(await fetchOpenFindings(domain_id))
   }
 
   async function runScan() {

@@ -267,6 +267,252 @@ function StatusBadge({ status }) {
   )
 }
 
+// ─── Finding modal ───────────────────────────────────────────────────────────────
+function RawDataBlock({ checkId, raw }) {
+  if (!raw || Object.keys(raw).length === 0) return null
+
+  // Lista de strings (dominios, repos, paths, etc.)
+  function StrList({ label, items, color }) {
+    if (!items?.length) return null
+    return (
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontFamily: C.mono, fontSize: 10, color: C.t3, letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 6 }}>{label}</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+          {items.map((v, i) => (
+            <span key={i} style={{
+              fontFamily: C.mono, fontSize: 12,
+              background: 'rgba(130,150,220,.08)', border: `1px solid rgba(130,150,220,.18)`,
+              color: color ?? C.t2, borderRadius: 6, padding: '3px 8px',
+            }}>{v}</span>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // Pares clave-valor
+  function KvRow({ label, value }) {
+    if (value === null || value === undefined) return null
+    return (
+      <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', marginBottom: 5 }}>
+        <span style={{ fontFamily: C.mono, fontSize: 11, color: C.t3, minWidth: 120, flexShrink: 0 }}>{label}</span>
+        <span style={{ fontFamily: C.mono, fontSize: 12, color: C.t1 }}>{String(value)}</span>
+      </div>
+    )
+  }
+
+  if (checkId === 'typosquatting') return (
+    <StrList label="Dominios registrados similares" items={raw.registered} color={C.amberText} />
+  )
+
+  if (checkId === 'subdomains') return (<>
+    <StrList label="Subdominios de riesgo" items={raw.risky} color={C.red} />
+    <StrList label="Todos los subdominios detectados" items={raw.subdomains?.filter(s => !raw.risky?.includes(s))} />
+  </>)
+
+  if (checkId === 'headers') return (
+    <StrList label="Headers faltantes" items={raw.missing} color={C.amberText} />
+  )
+
+  if (checkId === 'technology') return (<>
+    <StrList label="Tecnologías detectadas" items={raw.detected} />
+    <StrList label="Riesgos identificados" items={raw.risks} color={C.amberText} />
+  </>)
+
+  if (checkId === 'github') return (<>
+    <KvRow label="Resultados encontrados" value={raw.count} />
+    <StrList label="Repositorios" items={raw.repos} />
+  </>)
+
+  if (checkId === 'api') return (
+    <StrList label="Endpoints expuestos" items={raw.exposed} color={C.red} />
+  )
+
+  if (checkId === 'ip_reputation' && raw.ip) return (<>
+    <KvRow label="IP" value={raw.ip} />
+    <KvRow label="ISP" value={raw.isp} />
+    <KvRow label="Score de abuso" value={raw.score != null ? `${raw.score}/100` : undefined} />
+    <KvRow label="Reportes" value={raw.reports} />
+  </>)
+
+  if (checkId === 'uptime') return (<>
+    <KvRow label="Estado HTTP" value={raw.status} />
+    <KvRow label="Tiempo de respuesta" value={raw.responseTime != null ? `${raw.responseTime}ms` : undefined} />
+    <KvRow label="Error" value={raw.error} />
+  </>)
+
+  if (checkId === 'ssl' || checkId === 'tls') return (<>
+    <KvRow label="Grado SSL" value={raw.grade} />
+    <KvRow label="HSTS" value={raw.hsts != null ? (raw.hsts ? 'Activo' : 'Inactivo') : undefined} />
+    <KvRow label="Detalle" value={raw.detail} />
+    <StrList label="Problemas" items={raw.issues} color={C.amberText} />
+  </>)
+
+  if (checkId === 'spf' || checkId === 'dmarc') return raw.record ? (
+    <div>
+      <div style={{ fontFamily: C.mono, fontSize: 10, color: C.t3, letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 6 }}>Registro DNS actual</div>
+      <div style={{
+        fontFamily: C.mono, fontSize: 12, color: C.t1,
+        background: 'rgba(8,11,18,.6)', border: `1px solid ${C.border}`,
+        borderRadius: 8, padding: '10px 12px', wordBreak: 'break-all', lineHeight: 1.6,
+      }}>{raw.record}</div>
+    </div>
+  ) : null
+
+  if (checkId === 'urlscan') return (<>
+    <KvRow label="Total de apariciones" value={raw.total} />
+    <KvRow label="Maliciosos" value={raw.malicious} />
+    <KvRow label="Sospechosos" value={raw.suspicious} />
+    {raw.sample && <KvRow label="URL de muestra" value={raw.sample} />}
+  </>)
+
+  // Fallback genérico: pares clave-valor para cualquier shape no reconocido
+  return (
+    <div>
+      {Object.entries(raw).map(([k, v]) => {
+        if (v === null || v === undefined) return null
+        if (Array.isArray(v)) return <StrList key={k} label={k} items={v.map(String)} />
+        return <KvRow key={k} label={k} value={typeof v === 'object' ? JSON.stringify(v) : v} />
+      })}
+    </div>
+  )
+}
+
+function FindingModal({ findings, onClose }) {
+  const areaLabel = SURFACE_AREAS.find(a => a.category === findings[0]?.category)?.label ?? 'Hallazgos'
+
+  useEffect(() => {
+    const handler = e => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  function FindingBody({ f, showHeader }) {
+    return (
+      <div>
+        {showHeader && (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 14 }}>
+            <SevBadge sev={f.severity} />
+            <span style={{
+              fontFamily: C.title, fontWeight: 700, fontSize: 14,
+              color: C.t1, flex: 1, lineHeight: 1.4,
+            }}>{f.title_tech}</span>
+          </div>
+        )}
+        <p style={{ fontSize: 13, color: C.t2, lineHeight: 1.65, marginBottom: 14 }}>
+          {f.description_tech}
+        </p>
+        <div style={{
+          background: 'rgba(91,110,245,.07)', border: `1px solid rgba(91,110,245,.2)`,
+          borderRadius: 10, padding: '12px 15px', marginBottom: 14,
+        }}>
+          <div style={{ fontFamily: C.mono, fontSize: 10, color: C.link, letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 5 }}>
+            Acción recomendada
+          </div>
+          <p style={{ fontSize: 13, color: C.t1, margin: 0, lineHeight: 1.6 }}>{f.action_tech}</p>
+        </div>
+        {f.raw_data && Object.keys(f.raw_data).length > 0 && (
+          <div style={{
+            background: 'rgba(8,11,18,.4)', border: `1px solid ${C.border}`,
+            borderRadius: 10, padding: '12px 15px', marginBottom: 14,
+          }}>
+            <div style={{ fontFamily: C.mono, fontSize: 10, color: C.t3, letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 8 }}>
+              Datos detectados
+            </div>
+            <RawDataBlock checkId={f.check_id} raw={f.raw_data} />
+          </div>
+        )}
+        {f.reference && (
+          <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Icon name="info" size={13} color={C.t3} sw={1.5} />
+            <span style={{ fontFamily: C.mono, fontSize: 12, color: C.t3 }}>{f.reference}</span>
+          </div>
+        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+          <div>
+            <div style={{ fontFamily: C.mono, fontSize: 10, color: C.t3, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 3 }}>Detectado</div>
+            <div style={{ fontFamily: C.mono, fontSize: 12, color: C.t2 }}>
+              {f.first_seen_at
+                ? new Date(f.first_seen_at).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
+                : '—'}
+              {f.days_open > 0 && (
+                <span style={{ color: f.days_open >= 14 ? C.red : C.amberText, marginLeft: 6 }}>
+                  · {f.days_open} día{f.days_open !== 1 ? 's' : ''} abierto
+                </span>
+              )}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontFamily: C.mono, fontSize: 10, color: C.t3, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 3 }}>Estado</div>
+            <div style={{ fontFamily: C.mono, fontSize: 12 }}>
+              {f.resolved_at
+                ? <span style={{ color: C.greenText }}>Resuelto · {new Date(f.resolved_at).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}</span>
+                : <span style={{ color: C.amberText }}>Abierto</span>}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200,
+        background: 'rgba(8,11,18,.88)', backdropFilter: 'blur(5px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 20, overflowY: 'auto',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: '#0d1526',
+          border: `1px solid ${C.borderHi}`,
+          borderTop: `2px solid ${C.accent}`,
+          borderRadius: 18, padding: '28px 32px',
+          maxWidth: 560, width: '100%',
+          boxShadow: '0 24px 64px rgba(0,0,0,.55)',
+          maxHeight: 'calc(100vh - 80px)', overflowY: 'auto',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header del modal */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 20 }}>
+          {findings.length === 1
+            ? <SevBadge sev={findings[0].severity} />
+            : <span style={{
+                fontFamily: C.mono, fontSize: 11, color: C.link,
+                background: 'rgba(91,110,245,.1)', border: '1px solid rgba(91,110,245,.22)',
+                padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap',
+              }}>{findings.length} hallazgos</span>
+          }
+          <h2 style={{ fontFamily: C.title, fontWeight: 700, fontSize: 15, color: C.t1, margin: 0, flex: 1, lineHeight: 1.4 }}>
+            {findings.length === 1 ? findings[0].title_tech : areaLabel}
+          </h2>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.t3, fontSize: 22, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
+            onMouseEnter={e => e.currentTarget.style.color = C.t1}
+            onMouseLeave={e => e.currentTarget.style.color = C.t3}
+          >×</button>
+        </div>
+
+        {/* Cuerpo: single o multi */}
+        {findings.length === 1
+          ? <FindingBody f={findings[0]} showHeader={false} />
+          : findings.map((f, i) => (
+              <div key={f.id ?? i}>
+                {i > 0 && <div style={{ height: 1, background: C.border, margin: '20px 0' }} />}
+                <FindingBody f={f} showHeader={true} />
+              </div>
+            ))
+        }
+      </div>
+    </div>
+  )
+}
+
 // ─── Dashboard ───────────────────────────────────────────────────────────────────
 const SCANNER_URL = SCANNER_URL_BASE
 
@@ -291,6 +537,8 @@ export default function Dashboard() {
   const [inviting, setInviting]     = useState(false)
   const [inviteMsg, setInviteMsg]   = useState(null)
   const [removingId, setRemovingId] = useState(null)
+
+  const [findingModal,    setFindingModal]    = useState(null) // finding object | null
 
   // ─── Org config (personalización) ─────────────────────────────────────────
   const [phrasesList,      setPhrasesList]      = useState([])
@@ -924,14 +1172,26 @@ export default function Dashboard() {
                       : (areaF.length > 0 ? areaF[0].description_tech : a.subtitle)
 
                     return (
-                      <div key={i} style={{
-                        background: C.card,
-                        border: `1px solid ${isOk ? C.border : 'rgba(245,181,68,.25)'}`,
-                        borderLeft: isOk ? undefined : `3px solid ${C.amber}`,
-                        borderRadius: 12, padding: '14px 14px',
-                        opacity: isOk ? 0.8 : 1,
-                        transition: 'opacity .2s',
-                      }}>
+                      <div key={i}
+                        onClick={areaF.length > 0 ? () => setFindingModal(areaF) : undefined}
+                        style={{
+                          background: C.card,
+                          border: `1px solid ${isOk ? C.border : 'rgba(245,181,68,.25)'}`,
+                          borderLeft: isOk ? undefined : `3px solid ${C.amber}`,
+                          borderRadius: 12, padding: '14px 14px',
+                          opacity: isOk ? 0.8 : 1,
+                          transition: 'opacity .2s, border-color .15s',
+                          cursor: areaF.length > 0 ? 'pointer' : 'default',
+                        }}
+                        onMouseEnter={areaF.length > 0 ? e => {
+                          e.currentTarget.style.borderColor = C.borderHi
+                          e.currentTarget.style.opacity = '1'
+                        } : undefined}
+                        onMouseLeave={areaF.length > 0 ? e => {
+                          e.currentTarget.style.borderColor = isOk ? C.border : 'rgba(245,181,68,.25)'
+                          e.currentTarget.style.opacity = isOk ? '0.8' : '1'
+                        } : undefined}
+                      >
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                           <Icon name={a.icon} size={16} color={isOk ? C.t3 : C.amberText} />
                           <StatusBadge status={isOk ? 'ok' : 'review'} />
@@ -1564,6 +1824,10 @@ export default function Dashboard() {
 
         </div>
       </main>
+
+      {findingModal && (
+        <FindingModal findings={findingModal} onClose={() => setFindingModal(null)} />
+      )}
     </div>
   )
 }

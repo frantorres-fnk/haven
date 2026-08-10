@@ -78,15 +78,39 @@ export async function fetchScanHistory(domainId, { fromDate, toDate } = {}) {
 }
 
 /**
- * Retorna los hallazgos abiertos de un scan específico (todos los campos).
- * Usada por Dashboard.jsx para mostrar el detalle de findings.
+ * Retorna los hallazgos activos (no resueltos) de un dominio, uno por check_id.
+ *
+ * Por qué resolved_at IS NULL en la query (no solo status='open'):
+ *   markResolvedFindings hace PATCH { resolved_at } sin cambiar status,
+ *   por lo que filas resueltas siguen teniendo status='open'. Sin el filtro
+ *   de resolved_at, un hallazgo resuelto podría aparecer como activo.
+ *
+ * Por qué DISTINCT ON (check_id) en JS:
+ *   DNS inserta una fila nueva por scan para checks continuos (subdomains,
+ *   dmarc, etc.) sin resolver las anteriores mientras el check siga activo.
+ *   Ordenando por first_seen_at DESC el dedup siempre elige la fila más
+ *   reciente por check_id. Funciona también con phishing_search (upsert
+ *   garantiza una sola fila abierta, pasa el dedup sin cambios).
  */
 export async function fetchOpenFindings(domainId) {
   const { data } = await supabase
     .from('findings')
     .select('*')
     .eq('domain_id', domainId)
-    .eq('status', 'open')
-    .order('severity', { ascending: true })
-  return data ?? []
+    .is('resolved_at', null)
+    .order('first_seen_at', { ascending: false })
+
+  if (!data) return []
+
+  // DISTINCT ON (check_id): conservar solo la fila más reciente por check_id
+  const seen = new Set()
+  const deduped = data.filter(f => {
+    if (seen.has(f.check_id)) return false
+    seen.add(f.check_id)
+    return true
+  })
+
+  // Re-ordenar por severidad para la vista (critical → high → medium → low)
+  const SORDER = { critical: 0, high: 1, medium: 2, low: 3 }
+  return deduped.sort((a, b) => (SORDER[a.severity] ?? 9) - (SORDER[b.severity] ?? 9))
 }

@@ -103,6 +103,7 @@ const SURFACE_AREAS = [
   { icon: 'cpu',          label: 'Tecnologías',               subtitle: 'Stack tecnológico expuesto',      category: 'technology' },
   { icon: 'server',       label: 'IP Reputation',             subtitle: 'Reputación de tu servidor',       category: 'ip_reputation' },
   { icon: 'plug',         label: 'APIs expuestas',            subtitle: 'Endpoints sin protección',        category: 'api' },
+  { icon: 'send',         label: 'Phishing activo',           subtitle: 'Suplantación de marca en internet', category: 'phishing' },
 ]
 
 function getDataLaw(domain) {
@@ -1081,7 +1082,7 @@ export default function Dashboard() {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {findings.map((f, i) => {
-                      const catIcon = { credentials: 'key', email_security: 'mail', tls: 'shield-check', ssl: 'lock', uptime: 'globe', headers: 'app-window', subdomains: 'network', reputation: 'globe', exposure: 'code', darkweb: 'eye', typosquatting: 'copy', brand: 'copy', technology: 'cpu', ip_reputation: 'server', api: 'plug' }[f.category] || 'shield'
+                      const catIcon = { credentials: 'key', email_security: 'mail', tls: 'shield-check', ssl: 'lock', uptime: 'globe', headers: 'app-window', subdomains: 'network', reputation: 'globe', exposure: 'code', darkweb: 'eye', typosquatting: 'copy', brand: 'copy', technology: 'cpu', ip_reputation: 'server', api: 'plug', phishing: 'send' }[f.category] || 'shield'
                       const sevColor = (f.severity === 'critical' || f.severity === 'high') ? C.red : C.amber
                       return (
                         <div key={i} style={{
@@ -1155,7 +1156,7 @@ export default function Dashboard() {
                   <h2 style={{ fontFamily: C.title, fontWeight: 700, fontSize: 16, color: C.t1 }}>
                     Superficie monitoreada
                   </h2>
-                  <span style={{ fontFamily: C.mono, fontSize: 11, color: C.t3 }}>14 áreas · 24/7</span>
+                  <span style={{ fontFamily: C.mono, fontSize: 11, color: C.t3 }}>{SURFACE_AREAS.length} áreas · 24/7</span>
                 </div>
 
                 <div style={{

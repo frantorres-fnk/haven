@@ -910,7 +910,7 @@ export default function Admin() {
                           </div>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                             {btnSm('Facturación', () => { setModalError(''); setSelectedBilling(org.billing_type || 'stripe'); setModal({ type: 'billing-type', org }) })}
-                            {btnSm('Dar de baja', () => { setModalInput(''); setModal({ type: 'cancel', org }) }, true)}
+                            {btnSm('Dar de baja', () => { setModalInput(''); setModalError(''); setModal({ type: 'cancel', org }) }, true)}
                           </div>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                             <button

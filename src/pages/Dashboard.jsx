@@ -446,9 +446,15 @@ function FindingModal({ findings, onClose }) {
   }, [onClose])
 
   function FindingBody({ f, showHeader }) {
-    // helpState: 'idle' | 'loading' | 'done' | 'error'
-    // Si el finding ya tiene jira_key (pedido previo), mostramos confirmación directo
-    const [helpState, setHelpState] = useState(f.jira_key ? 'done' : 'idle')
+    // helpState: 'idle' | 'loading' | 'done' | 'already_open' | 'resolved' | 'error'
+    // Prioridad de inicialización (mayor a menor):
+    //   'resolved'     → f.resolved_at existe (problema ya cerrado, sin botón)
+    //   'already_open' → f.jira_key existe y no está resuelto (caso abierto previo)
+    //   'idle'         → ninguno de los dos (mostrar botón)
+    //   'done'         → el usuario acaba de enviar la solicitud en esta sesión (transición en runtime)
+    const [helpState, setHelpState] = useState(
+      f.resolved_at ? 'resolved' : f.jira_key ? 'already_open' : 'idle'
+    )
 
     async function handleRequestHelp() {
       if (!f.id) return
@@ -539,7 +545,24 @@ function FindingModal({ findings, onClose }) {
 
         {/* ── Botón de ayuda — uno por finding, independiente ── */}
         <div style={{ marginTop: 14 }}>
-          {helpState === 'done' ? (
+          {helpState === 'resolved' ? (
+            // Finding ya cerrado — sin botón, sin referencia a caso abierto
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: 'rgba(61,220,132,.05)', border: '1px solid rgba(61,220,132,.15)',
+              borderRadius: 10, padding: '10px 14px',
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke={C.greenText} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+              <span style={{ fontFamily: C.body, fontSize: 13, color: C.greenText, lineHeight: 1.4 }}>
+                Este problema fue resuelto
+              </span>
+            </div>
+          ) : helpState === 'done' ? (
+            // Solicitud recién enviada en esta sesión
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
               background: 'rgba(61,220,132,.07)', border: '1px solid rgba(61,220,132,.18)',
@@ -551,6 +574,23 @@ function FindingModal({ findings, onClose }) {
               </svg>
               <span style={{ fontFamily: C.body, fontSize: 13, color: C.greenText, lineHeight: 1.4 }}>
                 Nuestro equipo te va a contactar en 24hs
+              </span>
+            </div>
+          ) : helpState === 'already_open' ? (
+            // Caso ya existente antes de abrir el modal (finding.jira_key presente)
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: 'rgba(91,110,245,.06)', border: '1px solid rgba(91,110,245,.18)',
+              borderRadius: 10, padding: '10px 14px',
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke={C.link} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <span style={{ fontFamily: C.body, fontSize: 13, color: C.t2, lineHeight: 1.4 }}>
+                Ya hay un caso abierto para esto — nuestro equipo lo está viendo
               </span>
             </div>
           ) : (

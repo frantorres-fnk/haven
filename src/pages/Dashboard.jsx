@@ -446,6 +446,33 @@ function FindingModal({ findings, onClose }) {
   }, [onClose])
 
   function FindingBody({ f, showHeader }) {
+    // helpState: 'idle' | 'loading' | 'done' | 'error'
+    // Si el finding ya tiene jira_key (pedido previo), mostramos confirmación directo
+    const [helpState, setHelpState] = useState(f.jira_key ? 'done' : 'idle')
+
+    async function handleRequestHelp() {
+      if (!f.id) return
+      setHelpState('loading')
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const token = session?.access_token
+        const res = await fetch(`${SCANNER_URL}/support/request-help`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ finding_id: f.id }),
+        })
+        const data = await res.json()
+        // ok: true cubre tanto creación nueva como already_requested
+        if (data.ok) {
+          setHelpState('done')
+        } else {
+          setHelpState('error')
+        }
+      } catch {
+        setHelpState('error')
+      }
+    }
+
     return (
       <div>
         {showHeader && (
@@ -508,6 +535,66 @@ function FindingModal({ findings, onClose }) {
                 : <span style={{ color: C.amberText }}>Abierto</span>}
             </div>
           </div>
+        </div>
+
+        {/* ── Botón de ayuda — uno por finding, independiente ── */}
+        <div style={{ marginTop: 14 }}>
+          {helpState === 'done' ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: 'rgba(61,220,132,.07)', border: '1px solid rgba(61,220,132,.18)',
+              borderRadius: 10, padding: '10px 14px',
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="#3ddc84" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <span style={{ fontFamily: C.body, fontSize: 13, color: C.greenText, lineHeight: 1.4 }}>
+                Nuestro equipo te va a contactar en 24hs
+              </span>
+            </div>
+          ) : (
+            <>
+              {helpState === 'error' && (
+                <p style={{
+                  fontFamily: C.body, fontSize: 12, color: C.red,
+                  marginBottom: 8, lineHeight: 1.4,
+                }}>
+                  No pudimos procesar tu solicitud, intentá de nuevo
+                </p>
+              )}
+              <button
+                onClick={handleRequestHelp}
+                disabled={helpState === 'loading' || !f.id}
+                style={{
+                  width: '100%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                  background: helpState === 'loading' ? 'rgba(91,110,245,.06)' : 'rgba(91,110,245,.1)',
+                  border: `1px solid ${helpState === 'loading' ? 'rgba(91,110,245,.18)' : 'rgba(91,110,245,.32)'}`,
+                  borderRadius: 10, padding: '10px 16px',
+                  fontFamily: C.body, fontSize: 13, fontWeight: 600,
+                  color: helpState === 'loading' ? C.t3 : C.link,
+                  cursor: helpState === 'loading' || !f.id ? 'not-allowed' : 'pointer',
+                  transition: 'background .15s, border-color .15s, color .15s',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {helpState === 'loading' ? (
+                  'Enviando...'
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/>
+                      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                      <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    Necesito ayuda con esto
+                  </>
+                )}
+              </button>
+            </>
+          )}
         </div>
       </div>
     )

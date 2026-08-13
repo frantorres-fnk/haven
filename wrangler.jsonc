@@ -1,0 +1,13 @@
+{
+  "name": "scanner",
+  "main": "src/index.js",
+  "compatibility_date": "2026-06-24",
+  "triggers": {
+    "crons": ["*/5 * * * *", "0 8 1 * *", "0 9 * * *", "0 */4 * * *"]
+  },
+  "vars": {
+    "JIRA_BASE_URL": "https://fenikso-team.atlassian.net",
+    "JIRA_EMAIL": "administracion@fenikso.io",
+    "JIRA_PROJECT_KEY": "KAN"
+  }
+}

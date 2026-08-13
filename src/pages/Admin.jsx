@@ -223,6 +223,7 @@ export default function Admin() {
   const [activateOnBilling, setActivateOnBilling] = useState(false)
   const [testReport,      setTestReport]      = useState({})
   const [testPhishing,    setTestPhishing]    = useState({})
+  const [jiraTicket,      setJiraTicket]      = useState({})
 
   const [authEmail,    setAuthEmail]    = useState('')
   const [authPassword, setAuthPassword] = useState('')
@@ -385,6 +386,47 @@ export default function Admin() {
       }
     } catch (e) {
       setTestPhishing(prev => ({ ...prev, [domainId]: { loading: false, data: null, error: 'Red: ' + e.message } }))
+    }
+  }
+
+  // ── Crear ticket en Jira para un finding ────────────────────────────────────
+  async function handleCreateJiraTicket(finding) {
+    const id = finding.id
+    setJiraTicket(prev => ({ ...prev, [id]: { loading: true, error: '', jira_key: null, jira_url: null } }))
+    try {
+      const token = await getAuthToken()
+      const res = await fetch(`${SCANNER_URL}/admin/jira/create-ticket`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ finding_id: id }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setJiraTicket(prev => ({
+          ...prev,
+          [id]: { loading: false, error: '', jira_key: data.jira_key, jira_url: data.jira_url },
+        }))
+        // Reflejar jira_key en el estado local de orgs para que el botón cambie a link
+        setOrgs(prev => prev.map(org => ({
+          ...org,
+          domains: org.domains.map(d => ({
+            ...d,
+            findings: d.findings.map(f =>
+              f.id === id ? { ...f, jira_key: data.jira_key } : f
+            ),
+          })),
+        })))
+      } else {
+        setJiraTicket(prev => ({
+          ...prev,
+          [id]: { loading: false, error: data.error || 'Error desconocido', jira_key: null, jira_url: null },
+        }))
+      }
+    } catch (e) {
+      setJiraTicket(prev => ({
+        ...prev,
+        [id]: { loading: false, error: 'Red: ' + e.message, jira_key: null, jira_url: null },
+      }))
     }
   }
 
@@ -1108,9 +1150,15 @@ export default function Admin() {
                                   {sortedFindings.map((f, fi) => {
                                     const sCol = (f.severity === 'critical' || f.severity === 'high') ? C.red : f.severity === 'medium' ? C.amber : C.t3
                                     const sBg  = (f.severity === 'critical' || f.severity === 'high') ? 'rgba(242,99,126,.1)' : f.severity === 'medium' ? 'rgba(245,181,68,.1)' : 'rgba(130,150,220,.06)'
+                                    const jira = jiraTicket[f.id] || {}
+                                    // jira_key puede venir del estado remoto (f.jira_key) o de una creación reciente (jira.jira_key)
+                                    const resolvedKey = f.jira_key || jira.jira_key
+                                    const resolvedUrl = resolvedKey
+                                      ? (jira.jira_url || `https://fenikso-team.atlassian.net/browse/${resolvedKey}`)
+                                      : null
                                     return (
                                       <div key={fi} style={{
-                                        display: 'grid', gridTemplateColumns: '76px 110px 1fr',
+                                        display: 'grid', gridTemplateColumns: '76px 110px 1fr auto',
                                         gap: 10, alignItems: 'start',
                                         background: 'rgba(130,150,220,.03)', border: `1px solid ${C.border}`,
                                         borderRadius: 8, padding: '8px 12px',
@@ -1133,6 +1181,63 @@ export default function Admin() {
                                           <div style={{ fontFamily: C.body, fontSize: 11, color: C.t3, lineHeight: 1.4 }}>
                                             {f.action_tech}
                                           </div>
+                                        </div>
+                                        {/* ── Columna Jira ── */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, paddingTop: 1 }}>
+                                          {resolvedKey ? (
+                                            <a
+                                              href={resolvedUrl}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              title={`Abrir ${resolvedKey} en Jira`}
+                                              style={{
+                                                fontFamily: C.mono, fontSize: 10, fontWeight: 700,
+                                                color: '#579dff',
+                                                background: 'rgba(87,157,255,.1)',
+                                                border: '1px solid rgba(87,157,255,.25)',
+                                                padding: '2px 7px', borderRadius: 5,
+                                                textDecoration: 'none', whiteSpace: 'nowrap',
+                                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                                              }}
+                                            >
+                                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                                              </svg>
+                                              {resolvedKey}
+                                            </a>
+                                          ) : jira.loading ? (
+                                            <span style={{
+                                              fontFamily: C.mono, fontSize: 9, color: C.t3,
+                                              whiteSpace: 'nowrap',
+                                            }}>
+                                              ⏳ Creando...
+                                            </span>
+                                          ) : (
+                                            <button
+                                              onClick={() => handleCreateJiraTicket(f)}
+                                              disabled={!f.id}
+                                              title={!f.id ? 'Sin ID de finding' : 'Crear ticket en Jira'}
+                                              style={{
+                                                fontFamily: C.mono, fontSize: 9, fontWeight: 600,
+                                                letterSpacing: '.04em', whiteSpace: 'nowrap',
+                                                color: '#579dff',
+                                                background: 'rgba(87,157,255,.07)',
+                                                border: '1px solid rgba(87,157,255,.2)',
+                                                padding: '2px 7px', borderRadius: 5, cursor: 'pointer',
+                                                opacity: !f.id ? .4 : 1,
+                                              }}
+                                            >
+                                              + Jira
+                                            </button>
+                                          )}
+                                          {jira.error && (
+                                            <span style={{
+                                              fontFamily: C.mono, fontSize: 9, color: C.red,
+                                              maxWidth: 120, textAlign: 'right', lineHeight: 1.3,
+                                            }}>
+                                              {jira.error}
+                                            </span>
+                                          )}
                                         </div>
                                       </div>
                                     )

@@ -1,9 +1,12 @@
 import { supabase } from './supabase'
 
 /**
- * Retorna el último scan completado y el conteo de hallazgos abiertos
- * de ESE scan específico. Nunca acumula hallazgos de scans históricos.
+ * Retorna el último scan completado (score) y el conteo de hallazgos abiertos
+ * del dominio, uno por check_id (misma regla que fetchOpenFindings).
  * Usada por las tarjetas de Domains.jsx.
+ *
+ * No se cuenta por scan_id: con el modelo por incidente un FAIL continuo
+ * conserva el scan_id donde se abrió (no se reinserta en cada scan).
  */
 export async function fetchLatestScanCard(domainId) {
   const { data: scans } = await supabase
@@ -20,11 +23,24 @@ export async function fetchLatestScanCard(domainId) {
 
   const { data: findings } = await supabase
     .from('findings')
-    .select('id')
-    .eq('scan_id', lastScan.id)
-    .eq('status', 'open')
+    .select('check_id')
+    .eq('domain_id', domainId)
+    .is('resolved_at', null)
 
-  return { lastScan, findingsCount: findings?.length ?? 0 }
+  return { lastScan, findingsCount: new Set((findings ?? []).map(f => f.check_id)).size }
+}
+
+/**
+ * Estado por check del monitoreo continuo (domain_check_state).
+ * Devuelve [] si la tabla todavía no existe o el dominio aún no tiene filas.
+ */
+export async function fetchCheckStates(domainId) {
+  const { data, error } = await supabase
+    .from('domain_check_state')
+    .select('check_id, last_status, last_run_at, last_valid_at, next_run_at')
+    .eq('domain_id', domainId)
+  if (error || !data) return []
+  return data
 }
 
 /**

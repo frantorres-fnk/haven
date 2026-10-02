@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { resolveMembership } from '../lib/membership'
-import { fetchCompletedScans, fetchOpenFindings, fetchScanHistory } from '../lib/domainStats'
+import { fetchCompletedScans, fetchOpenFindings, fetchScanHistory, fetchCheckStates } from '../lib/domainStats'
 import Wordmark from '../components/Wordmark'
 import ScoreEvolution from '../components/ScoreEvolution'
 
@@ -152,6 +152,14 @@ function timeSince(dateStr) {
   if (seconds < 3600)  return `hace ${Math.floor(seconds / 60)} min`
   if (seconds < 86400) return `hace ${Math.floor(seconds / 3600)} h`
   return `hace ${Math.floor(seconds / 86400)} días`
+}
+
+// Nombres de los controles del monitoreo continuo (check_id del worker)
+const CHECK_LABELS = {
+  uptime: 'Disponibilidad', tls: 'HTTPS', headers: 'Headers de seguridad', apiexposure: 'APIs y archivos expuestos',
+  spf: 'SPF', dmarc: 'DMARC', urlscan: 'Reputación (URLScan)', ssl: 'Certificado SSL',
+  tech: 'Tecnologías expuestas', subdomains: 'Subdominios', typosquatting: 'Dominios similares',
+  github: 'Exposición en GitHub', darkweb: 'Dark web y filtraciones', ipreputation: 'Reputación de IP',
 }
 
 // Penalización extra por antigüedad (espeja la lógica de calculateScore en el worker)
@@ -715,6 +723,8 @@ export default function Dashboard() {
   const [loadError, setLoadError] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [scanHistory, setScanHistory] = useState([])
+  const [checkStates, setCheckStates] = useState([])
+  const [showChecks, setShowChecks]   = useState(false)
   const [checkingOut, setCheckingOut] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   // Equipo (sólo owner)
@@ -852,11 +862,13 @@ export default function Dashboard() {
   }
 
   async function loadLatestScan(domain_id) {
-    const [scans, history] = await Promise.all([
+    const [scans, history, states] = await Promise.all([
       fetchCompletedScans(domain_id, 10),
       fetchScanHistory(domain_id),
+      fetchCheckStates(domain_id),
     ])
     setScanHistory(history)
+    setCheckStates(states)
 
     if (!scans.length) {
       setScan(null); setPrevScan(null); setFindings([]); return
@@ -943,6 +955,7 @@ export default function Dashboard() {
   const compPct      = Math.round(compHit / compTot * 100)
   const dataLaw      = getDataLaw(domain?.domain)
   const score        = scan?.score ?? 0
+  const lastVerification = checkStates.reduce((m, st) => (st.last_run_at && (!m || st.last_run_at > m) ? st.last_run_at : m), null)
   const grade        = scoreGrade(score)
   const gradeNext    = nextGrade(score)
   const col          = scoreColors(score)
@@ -1224,7 +1237,7 @@ export default function Dashboard() {
 
                   <div style={{ display: 'flex', gap: isMobile ? 18 : 32, flexWrap: 'wrap', justifyContent: isMobile ? 'center' : 'flex-start' }}>
                     {[
-                      ['ÚLTIMO SCAN', timeSince(scan.completed_at)],
+                      ['ÚLTIMA VERIFICACIÓN', timeSince(lastVerification ?? scan.completed_at)],
                       ['HALLAZGOS', `${findings.length} abiertos`],
                       ['PLAN', org?.plan?.toUpperCase() ?? '—'],
                     ].map(([label, val]) => (
@@ -1234,6 +1247,37 @@ export default function Dashboard() {
                       </div>
                     ))}
                   </div>
+
+                  {checkStates.length > 0 && (
+                    <div style={{ marginTop: 14 }}>
+                      <button onClick={() => setShowChecks(v => !v)} style={{
+                        background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                        display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: C.body, fontSize: 12, color: C.t2,
+                      }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: C.green, boxShadow: '0 0 0 3px rgba(61,220,132,.15)' }} />
+                        Monitoreo activo · {checkStates.length} controles {showChecks ? '▴' : '▾'}
+                      </button>
+                      {showChecks && (
+                        <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '6px 24px', maxWidth: 560 }}>
+                          {[...checkStates]
+                            .sort((a, b) => (CHECK_LABELS[a.check_id] ?? a.check_id).localeCompare(CHECK_LABELS[b.check_id] ?? b.check_id))
+                            .map(st => {
+                              const [dot, label] = st.last_status === 'fail' ? [C.red, 'con hallazgo']
+                                : st.last_status === 'pass' ? [C.green, 'ok']
+                                : st.last_status === 'unknown' ? [C.amber, 'sin evaluar']
+                                : [C.t3, 'pendiente']
+                              return (
+                                <div key={st.check_id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                                  <span title={label} style={{ width: 6, height: 6, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+                                  <span style={{ color: C.t1, flex: 1 }}>{CHECK_LABELS[st.check_id] ?? st.check_id}</span>
+                                  <span style={{ color: C.t3, fontFamily: C.mono, fontSize: 11 }}>{st.last_run_at ? timeSince(st.last_run_at) : 'pendiente'}</span>
+                                </div>
+                              )
+                            })}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {prevScan && (() => {
                     const delta    = scan.score - prevScan.score

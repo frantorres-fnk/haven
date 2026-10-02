@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { resolveMembership } from '../lib/membership'
+import { requestScan } from '../lib/scan'
 import { fetchCompletedScans, fetchOpenFindings, fetchScanHistory, fetchCheckStates } from '../lib/domainStats'
 import Wordmark from '../components/Wordmark'
 import ScoreEvolution from '../components/ScoreEvolution'
@@ -722,6 +723,7 @@ export default function Dashboard() {
   const [loading, setLoading]   = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [scanning, setScanning] = useState(false)
+  const [scanError, setScanError] = useState(null)
   const [scanHistory, setScanHistory] = useState([])
   const [checkStates, setCheckStates] = useState([])
   const [showChecks, setShowChecks]   = useState(false)
@@ -889,17 +891,12 @@ export default function Dashboard() {
   }
 
   async function runScan() {
-    if (!domain || !org) return
+    if (!domain || !org || scanning) return   // evita doble envío
     setScanning(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`${SCANNER_URL}/scan/dns`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ domain_id: domain.id, org_id: org.id }),
-      })
-      const data = await res.json()
-      if (data.ok) await loadLatestScan(domain.id)
-    } catch (e) { console.error('Error corriendo scan:', e) }
+    setScanError(null)
+    const r = await requestScan(domain.id, org.id)
+    if (r.ok) await loadLatestScan(domain.id)
+    else setScanError(r.error)
     setScanning(false)
   }
 
@@ -1133,6 +1130,17 @@ export default function Dashboard() {
             </div>
           )}
 
+          {scanError && (
+            <div role="alert" style={{
+              display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16,
+              background: 'rgba(242,99,126,.08)', border: '1px solid rgba(242,99,126,.25)',
+              borderRadius: 12, padding: '10px 14px', fontSize: 13, color: C.red,
+            }}>
+              <span style={{ flex: 1 }}>{scanError}</span>
+              <button onClick={() => setScanError(null)} aria-label="Cerrar" style={{ background: 'none', border: 'none', color: C.t3, cursor: 'pointer', fontSize: 16 }}>×</button>
+            </div>
+          )}
+
           {/* NO SCAN */}
           {!scan && !scanning && (
             <div style={{
@@ -1147,7 +1155,7 @@ export default function Dashboard() {
               <p style={{ color: C.t2, fontSize: 14, marginBottom: 24 }}>
                 Corré el primer scan para ver el estado real de tu empresa.
               </p>
-              <button onClick={runScan} style={{
+              <button onClick={runScan} disabled={scanning} style={{
                 background: C.accentGrad, color: '#fff', border: 'none',
                 borderRadius: 10, padding: '12px 28px',
                 fontSize: 15, fontWeight: 700, fontFamily: C.title, cursor: 'pointer',

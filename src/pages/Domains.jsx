@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { resolveMembership } from '../lib/membership'
 import { fetchLatestScanCard } from '../lib/domainStats'
+import { requestScan } from '../lib/scan'
 import Wordmark from '../components/Wordmark'
 
 const SCANNER_URL = import.meta.env.VITE_SCANNER_URL || 'https://scanner.franzthorres.workers.dev'
@@ -127,7 +128,7 @@ function MiniRing({ score }) {
 }
 
 // ─── Tarjeta de dominio ───────────────────────────────────────────────────────
-function DomainCard({ d, onDetail, onScan, onDelete, scanning }) {
+function DomainCard({ d, onDetail, onScan, onDelete, scanning, scanError }) {
   const score     = d.lastScan?.score ?? null
   const col       = scoreColor(score)
   const border    = scoreBorderColor(score)
@@ -268,7 +269,7 @@ function DomainCard({ d, onDetail, onScan, onDelete, scanning }) {
           <Icon name="arrow-right" size={13} color="#fff" />
         </button>
 
-        {!scanning && onScan && (
+        {onScan && (
           <button
             onClick={onScan}
             disabled={scanning}
@@ -285,6 +286,12 @@ function DomainCard({ d, onDetail, onScan, onDelete, scanning }) {
             <Icon name="refresh-cw" size={12} color={C.link} />
             {scanning ? 'Analizando…' : 'Analizar'}
           </button>
+        )}
+
+        {scanError && (
+          <div role="alert" style={{ fontFamily: C.body, fontSize: 12, color: C.red, maxWidth: 220, textAlign: 'right', lineHeight: 1.4 }}>
+            {scanError}
+          </div>
         )}
 
         {!isPrimary && onDelete && (
@@ -318,6 +325,7 @@ export default function Domains() {
   const [loadError, setLoadError] = useState(false)
   const [adding, setAdding]     = useState(false)
   const [scanning, setScanning] = useState(null)
+  const [scanError, setScanError] = useState(null)   // { domainId, message }
   const [form, setForm]         = useState({ domain: '', label: '' })
   const [error, setError]       = useState('')
   const [focused, setFocused]   = useState(null)
@@ -393,26 +401,23 @@ export default function Domains() {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ domain_id: domainId, org_id: org.id }),
       }).catch(() => {})
-      await fetch(`${SCANNER_URL}/scan/dns`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ domain_id: domainId, org_id: org.id }),
-      })
-    } catch { /* scan no bloqueante */ }
+    } catch { /* brand hint no bloqueante */ }
+    // Primer análisis del proveedor (mismo helper que "Analizar"); si falla, el alta
+    // igual quedó hecha y se avisa en la tarjeta
+    const scanResult = await requestScan(domainId, org.id)
+    if (!scanResult.ok) setScanError({ domainId, message: scanResult.error })
     setForm({ domain: '', label: '' })
     setAdding(false)
     await loadData()
   }
 
   async function handleScan(d) {
+    if (scanning) return   // un análisis por vez desde esta pantalla
     setScanning(d.id)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      await fetch(`${SCANNER_URL}/scan/dns`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ domain_id: d.id, org_id: org.id }),
-      })
-      await loadData()
-    } catch { /* ignorar */ }
+    setScanError(null)
+    const r = await requestScan(d.id, org.id)
+    if (r.ok) await loadData()
+    else setScanError({ domainId: d.id, message: r.error })
     setScanning(null)
   }
 
@@ -567,6 +572,7 @@ export default function Domains() {
                 key={d.id}
                 d={d}
                 scanning={scanning === d.id}
+                scanError={scanError?.domainId === d.id ? scanError.message : null}
                 onDetail={() => navigate(`/dashboard?domain=${d.id}`)}
                 onScan={orgRole !== 'viewer' ? () => handleScan(d) : null}
                 onDelete={orgRole !== 'viewer' ? () => handleDelete(d) : null}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { resolveMembership } from '../lib/membership'
 import { fetchLatestScanCard } from '../lib/domainStats'
 import Wordmark from '../components/Wordmark'
 
@@ -314,6 +315,7 @@ export default function Domains() {
   const [orgRole, setOrgRole]   = useState(null)   // 'owner' | 'admin' | 'viewer'
   const [domains, setDomains]   = useState([])
   const [loading, setLoading]   = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [adding, setAdding]     = useState(false)
   const [scanning, setScanning] = useState(null)
   const [form, setForm]         = useState({ domain: '', label: '' })
@@ -324,17 +326,12 @@ export default function Domains() {
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { navigate('/login'); return }
-
+    setLoadError(false)
     // Resolver membresía: auth.uid() → org_id + role
-    const { data: membership } = await supabase
-      .from('org_members')
-      .select('org_id, role')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!membership) { navigate('/login'); return }
+    const m = await resolveMembership(supabase)
+    if (m.status === 'error') { setLoadError(true); setLoading(false); return }   // sesión intacta, se ofrece reintentar
+    if (m.status !== 'ok') { navigate('/login'); return }
+    const membership = { org_id: m.orgId, role: m.role }
     setOrgRole(membership.role)
 
     const { data: orgData } = await supabase
@@ -372,24 +369,33 @@ export default function Domains() {
       return
     }
     setAdding(true)
-    const { data: domainData, error: domainError } = await supabase
-      .from('domains').insert({
-        org_id: org.id, domain: cleanDomain,
-        domain_type: 'supplier', domain_label: form.label || cleanDomain,
-        verified: true, is_primary: false, monitoring_active: true,
-      }).select().single()
-    if (domainError) { setError('Error agregando el dominio.'); setAdding(false); return }
+    // Alta server-side: el Worker valida rol y límite del plan y marca el proveedor
+    // como monitoreado (el cliente ya no puede escribir verified/monitoring_active).
+    let domainId
+    let session
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      ;({ data: { session } } = await supabase.auth.getSession())
+      const res = await fetch(`${SCANNER_URL}/domains/supplier`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ org_id: org.id, domain: cleanDomain, label: form.label || cleanDomain }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) { setError(data.error || 'Error agregando el dominio.'); setAdding(false); return }
+      domainId = data.domain_id
+    } catch {
+      setError('No pudimos conectar con el servicio. Intentá de nuevo.'); setAdding(false); return
+    }
+    try {
       // Fire-and-forget: extrae brand hint del sitio en background, no bloquea el alta
       fetch(`${SCANNER_URL}/extract-brand-hint`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ domain_id: domainData.id, domain: cleanDomain, org_id: org.id }),
+        body: JSON.stringify({ domain_id: domainId, org_id: org.id }),
       }).catch(() => {})
       await fetch(`${SCANNER_URL}/scan/dns`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ domain: cleanDomain, org_id: org.id, domain_id: domainData.id }),
+        body: JSON.stringify({ domain_id: domainId, org_id: org.id }),
       })
     } catch { /* scan no bloqueante */ }
     setForm({ domain: '', label: '' })
@@ -403,7 +409,7 @@ export default function Domains() {
       const { data: { session } } = await supabase.auth.getSession()
       await fetch(`${SCANNER_URL}/scan/dns`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ domain: d.domain, org_id: org.id, domain_id: d.id }),
+        body: JSON.stringify({ domain_id: d.id, org_id: org.id }),
       })
       await loadData()
     } catch { /* ignorar */ }
@@ -440,6 +446,22 @@ export default function Domains() {
           <Wordmark size={36} variant="outline" />
         </div>
         <p style={{ color: C.t3, fontSize: 14, fontFamily: C.body }}>Cargando dominios…</p>
+      </div>
+    </div>
+  )
+
+  if (loadError) return (
+    <div style={{ minHeight: '100vh', background: C.bg, display: 'grid', placeItems: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+          <Wordmark size={36} variant="outline" />
+        </div>
+        <p style={{ color: C.t2, fontSize: 14, fontFamily: C.body, marginBottom: 14 }}>
+          No pudimos conectar con el servicio. Tu sesión sigue activa.
+        </p>
+        <button onClick={() => { setLoading(true); loadData() }} style={{ background: C.accentGrad, color: '#fff', border: 'none', borderRadius: 10, padding: '10px 20px', fontFamily: C.body, fontWeight: 600, cursor: 'pointer' }}>
+          Reintentar
+        </button>
       </div>
     </div>
   )

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { authErrorMessage } from '../lib/authErrors'
 import Wordmark from '../components/Wordmark'
 
 function IconMail() {
@@ -43,9 +44,15 @@ export default function Login() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
+    let authError
+    try {
+      ;({ error: authError } = await supabase.auth.signInWithPassword({ email, password }))
+    } catch (e) {
+      authError = e
+    }
     if (authError) {
-      setError('Email o contraseña incorrectos')
+      // Solo un 400 invalid_credentials es "contraseña incorrecta"; 5xx/red/timeout → servicio no disponible
+      setError(authErrorMessage(authError))
       setLoading(false)
     } else {
       navigate('/dashboard')

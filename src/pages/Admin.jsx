@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { authErrorMessage } from '../lib/authErrors'
 import Wordmark from '../components/Wordmark'
 
 const SCANNER_URL = import.meta.env.VITE_SCANNER_URL || 'https://scanner.franzthorres.workers.dev'
@@ -248,39 +249,44 @@ export default function Admin() {
     setAuthError('')
     await supabase.auth.signOut()
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email: authEmail, password: authPassword,
     })
     if (error) {
-      setAuthError('Credenciales incorrectas')
+      setAuthError(authErrorMessage(error))
       setAuthLoading(false)
       return
     }
 
-    const { data: adminData } = await supabase
-      .from('admin_users').select('*').eq('email', data.user.email).single()
-
-    if (!adminData) {
+    // La autorización la decide el Worker (verifyAdmin, server-side): el portal ya
+    // no consulta admin_users directamente.
+    let status
+    try {
+      status = await loadOrgs()
+    } catch {
+      status = 0
+    }
+    if (status !== 200) {
       await supabase.auth.signOut()
-      setAuthError('No tenés permisos de administrador')
+      setAuthError(status === 401 || status === 403
+        ? 'No tenés permisos de administrador'
+        : 'El servicio no está disponible en este momento. Intentá de nuevo.')
       setAuthLoading(false)
       return
     }
 
     setIsAdmin(true)
-    setLoading(true)
-    await loadOrgs()
-    setLoading(false)
     setAuthLoading(false)
   }
 
+  // Devuelve el status HTTP de /admin/data (200 = admin autorizado)
   async function loadOrgs() {
     const token = await getAuthToken()
     const res   = await fetch(`${SCANNER_URL}/admin/data`, {
       headers: { 'Authorization': `Bearer ${token}` },
     })
-    const data = await res.json()
-    if (!data.ok) return
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data.ok) return res.status === 200 ? 500 : res.status
 
     const orgsWithData = data.orgs.map(org => {
       const orgDomains    = data.domains.filter(d => d.org_id === org.id)
@@ -305,6 +311,7 @@ export default function Admin() {
     const cancelled = orgsWithData.filter(o => o.status === 'cancelled')
     const mrr       = active.reduce((sum, o) => sum + (planPrices[o.plan] || 0), 0)
     setStats({ total: orgsWithData.length, active: active.length, trialing: trialing.length, cancelled: cancelled.length, mrr })
+    return 200
   }
 
   async function handleAddAdmin(e) {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { resolveMembership } from '../lib/membership'
 import { fetchCompletedScans, fetchOpenFindings, fetchScanHistory } from '../lib/domainStats'
 import Wordmark from '../components/Wordmark'
 import ScoreEvolution from '../components/ScoreEvolution'
@@ -711,6 +712,7 @@ export default function Dashboard() {
   const [findings, setFindings] = useState([])
   const [view, setView]         = useState('owner')
   const [loading, setLoading]   = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [scanHistory, setScanHistory] = useState([])
   const [checkingOut, setCheckingOut] = useState(false)
@@ -753,17 +755,13 @@ export default function Dashboard() {
   }, [])
 
   async function loadData() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { navigate('/login'); return }
-
+    setLoadError(false)
+    setLoading(true)
     // Resolver membresía: auth.uid() → org_id + role
-    const { data: membership } = await supabase
-      .from('org_members')
-      .select('org_id, role')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!membership) { navigate('/login'); return }
+    const m = await resolveMembership(supabase)
+    if (m.status === 'error') { setLoadError(true); setLoading(false); return }   // sesión intacta, se ofrece reintentar
+    if (m.status !== 'ok') { navigate('/login'); return }
+    const membership = { org_id: m.orgId, role: m.role }
     setOrgId(membership.org_id)
     setOrgRole(membership.role)
 
@@ -885,7 +883,7 @@ export default function Dashboard() {
       const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch(`${SCANNER_URL}/scan/dns`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ domain: domain.domain, org_id: org.id, domain_id: domain.id, org_name: org.name, org_email: org.email }),
+        body: JSON.stringify({ domain_id: domain.id, org_id: org.id }),
       })
       const data = await res.json()
       if (data.ok) await loadLatestScan(domain.id)
@@ -917,6 +915,22 @@ export default function Dashboard() {
           <Wordmark size={40} variant="outline" />
         </div>
         <p style={{ color: C.t3, fontSize: 14, fontFamily: C.body }}>Cargando tu portal...</p>
+      </div>
+    </div>
+  )
+
+  if (loadError) return (
+    <div style={{ minHeight: '100vh', background: C.bg, display: 'grid', placeItems: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+          <Wordmark size={40} variant="outline" />
+        </div>
+        <p style={{ color: C.t2, fontSize: 14, fontFamily: C.body, marginBottom: 14 }}>
+          No pudimos conectar con el servicio. Tu sesión sigue activa.
+        </p>
+        <button onClick={loadData} style={{ background: C.accentGrad, color: '#fff', border: 'none', borderRadius: 10, padding: '10px 20px', fontFamily: C.body, fontWeight: 600, cursor: 'pointer' }}>
+          Reintentar
+        </button>
       </div>
     </div>
   )

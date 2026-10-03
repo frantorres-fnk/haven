@@ -9,6 +9,7 @@ import Admin from './pages/Admin'
 import AcceptInvite from './pages/AcceptInvite'
 import PasswordRequired from './pages/PasswordRequired'
 import Account from './pages/Account'
+import OnboardingDomain from './pages/OnboardingDomain'
 import RequireAccount from './components/RequireAccount'
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
         <Route path="/admin" element={<RequireAccount><Admin /></RequireAccount>} />
         <Route path="/accept-invite" element={<AcceptInvite />} />
         <Route path="/account" element={<RequireAccount><Account /></RequireAccount>} />
+        <Route path="/onboarding/domain" element={<RequireAccount><OnboardingDomain /></RequireAccount>} />
         <Route path="/account/password-required" element={<RequireAccount allowPasswordChange><PasswordRequired /></RequireAccount>} />
       </Routes>
     </BrowserRouter>

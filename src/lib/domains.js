@@ -88,3 +88,25 @@ export async function sendDomainVerification(domainId, { client = supabase, fetc
   }
   return { ok: false, status: res.status, error: VERIFY_MESSAGES[res.status] ?? VERIFY_MESSAGES.server }
 }
+
+// Qué muestra /onboarding/domain según el estado de la cuenta (lib/account)
+//   form      → owner sin dominio principal: "Agregá tu dominio"
+//   pending   → dominio creado sin confirmar: "Te enviamos un mail…" + reenviar
+//   dashboard → ya confirmado (o no se pudo leer): al portal
+//   forbidden → admin/viewer: solo el owner configura el dominio
+export function onboardingDomainView(account) {
+  if (account?.status !== 'ok') return 'dashboard'
+  const d = account.primaryDomain
+  if (d === undefined) return 'dashboard'
+  if (d && d.verified) return 'dashboard'
+  if (account.role !== 'owner') return 'forbidden'
+  return d ? 'pending' : 'form'
+}
+
+// Error del insert de domains (trigger P0 / RLS) → mensaje para la UI
+export function domainInsertErrorMessage(error) {
+  const msg = String(error?.message ?? '')
+  if (/límite de dominios/i.test(msg)) return 'Tu plan no permite agregar más dominios. Contactá a soporte.'
+  if (error?.code === '42501' || /row-level security/i.test(msg)) return 'No tenés permisos para agregar el dominio.'
+  return 'No pudimos agregar el dominio. Intentá nuevamente.'
+}

@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 vi.mock('../supabase', () => ({ supabase: {} }))
-const { normalizeDomain, normalizeDomainInput, DOMAIN_RE, primaryDomainPayload, createPrimaryDomain, sendDomainVerification, requestBrandHint } = await import('../domains')
+const { normalizeDomain, normalizeDomainInput, DOMAIN_RE, primaryDomainPayload, createPrimaryDomain, sendDomainVerification, requestBrandHint, onboardingDomainView, domainInsertErrorMessage } = await import('../domains')
 const { SCANNER_URL } = await import('../scan')
 
 const sessionClient = (token = 'tok-1') => ({ auth: { getSession: async () => ({ data: { session: { access_token: token } } }) } })
@@ -127,5 +127,42 @@ describe('signup self-service: regresión estructural', () => {
     expect(code).not.toMatch(/\/send-verification/)
     expect(code).not.toMatch(/\/extract-brand-hint/)
     expect(code).not.toMatch(/from\('domains'\)\.insert/)
+  })
+})
+
+describe('onboarding de org existente (/onboarding/domain)', () => {
+  const owner = (primaryDomain) => ({ status: 'ok', role: 'owner', orgId: 'org-o', primaryDomain })
+
+  it('vista según el estado: form, pending, dashboard, forbidden', () => {
+    expect(onboardingDomainView(owner(null))).toBe('form')
+    expect(onboardingDomainView(owner({ id: 'd1', domain: 'openit.com.ar', verified: false }))).toBe('pending')
+    expect(onboardingDomainView(owner({ id: 'd1', domain: 'openit.com.ar', verified: true }))).toBe('dashboard')
+    expect(onboardingDomainView(owner(undefined))).toBe('dashboard')
+    expect(onboardingDomainView({ status: 'ok', role: 'viewer', primaryDomain: null })).toBe('forbidden')
+    expect(onboardingDomainView({ status: 'ok', role: 'admin', primaryDomain: null })).toBe('forbidden')
+    expect(onboardingDomainView({ status: 'must_change' })).toBe('dashboard')   // el guard ya lo desvía antes
+  })
+
+  it('errores del insert (trigger P0 / RLS) → mensajes legibles', () => {
+    expect(domainInsertErrorMessage({ code: '42501', message: 'domains: límite de dominios del plan alcanzado' })).toMatch(/plan/)
+    expect(domainInsertErrorMessage({ code: '42501', message: 'new row violates row-level security policy' })).toMatch(/permisos/)
+    expect(domainInsertErrorMessage({ message: 'boom' })).toMatch(/No pudimos agregar/)
+  })
+
+  const here = dirname(fileURLToPath(import.meta.url))
+  const src = (p) => readFileSync(join(here, '../..', p), 'utf8')
+
+  it('la página usa el mismo camino que el signup y no crea usuario ni organización', () => {
+    const page = src('pages/OnboardingDomain.jsx')
+    expect(page).toMatch(/createPrimaryDomain\(account\.orgId, domain\)/)
+    expect(page).toMatch(/await sendDomainVerification\(data\.id\)/)
+    expect(page).toMatch(/Te enviamos un mail para confirmar \{pending\.domain\}/)
+    expect(page).toMatch(/<ResendVerificationButton/)
+    expect(page).not.toMatch(/signUp|from\('organizations'\)|from\('org_members'\)/)
+    expect(page).not.toMatch(/\/scan\/dns|requestScan/)    // sin scan: lo hace el scheduler tras confirmar
+  })
+
+  it('ruta protegida por el guard', () => {
+    expect(src('App.jsx')).toMatch(/path="\/onboarding\/domain" element={<RequireAccount><OnboardingDomain \/><\/RequireAccount>}/)
   })
 })

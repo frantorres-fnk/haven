@@ -1,14 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { normalizeDomain, DOMAIN_RE, createPrimaryDomain, requestBrandHint, sendDomainVerification } from '../lib/domains'
 import Wordmark from '../components/Wordmark'
-
-const SCANNER_URL = import.meta.env.VITE_SCANNER_URL || 'https://scanner.franzthorres.workers.dev'
-
-// ── Helpers ───────────────────────────────────────────────────────────
-function normalizeDomain(raw) {
-  return (raw || '').trim().replace(/^https?:\/\//i, '').split('/')[0].toLowerCase()
-}
 
 // ── Icons (línea) ─────────────────────────────────────────────────────
 function IconBuilding() {
@@ -167,8 +161,6 @@ export default function Onboarding() {
 
   const domain = normalizeDomain(form.domain)
 
-  const DOMAIN_RE = /^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/i
-
   function handleNext() {
     if (!form.company.trim()) { setError('Ingresá el nombre de tu empresa.'); return }
     if (!form.domain.trim())  { setError('Ingresá el dominio web de tu empresa.'); return }
@@ -221,30 +213,13 @@ export default function Onboarding() {
     })
     if (memberError) { setError('Error configurando los permisos de acceso'); setLoading(false); return }
 
-    const { data: domainData } = await supabase.from('domains').insert({
-      org_id: authData.user.id,
-      domain,
-      verified: false,
-      is_primary: true,
-      monitoring_active: false,
-      verification_token_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    }).select().single()
+    const { data: domainData } = await createPrimaryDomain(authData.user.id, domain)
 
     if (domainData) {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        // Fire-and-forget: extrae brand hint del sitio en background, no bloquea el onboarding
-        fetch(`${SCANNER_URL}/extract-brand-hint`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-          body: JSON.stringify({ domain_id: domainData.id, org_id: authData.user.id }),
-        }).catch(() => {})
-        await fetch(`${SCANNER_URL}/send-verification`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-          body: JSON.stringify({ domain_id: domainData.id }),
-        })
-      } catch (err) { console.error('Error mandando mail de verificación:', err) }
+      // Fire-and-forget: extrae brand hint del sitio en background, no bloquea el onboarding
+      requestBrandHint(domainData.id, authData.user.id)
+      const sent = await sendDomainVerification(domainData.id)
+      if (sent.status === 0) console.error('Error mandando mail de verificación:', sent.error)
     }
 
     setStep(3)

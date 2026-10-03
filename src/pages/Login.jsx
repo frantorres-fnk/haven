@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { authErrorMessage } from '../lib/authErrors'
+import { getAccountState, accountRoute } from '../lib/account'
 import Wordmark from '../components/Wordmark'
 
 function IconMail() {
@@ -55,7 +56,8 @@ export default function Login() {
       setError(authErrorMessage(authError))
       setLoading(false)
     } else {
-      navigate('/dashboard')
+      // Contraseña temporal → cambio obligatorio; owner sin dominio → onboarding
+      navigate(accountRoute(await getAccountState(supabase)))
     }
   }
 

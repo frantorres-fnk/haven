@@ -10,6 +10,7 @@ const MESSAGES = {
   network:  'No pudimos conectar con el servicio. Intentá nuevamente.',
   forbidden:'No tenés permisos para analizar este dominio.',
   generic:  'No pudimos iniciar el análisis. Intentá nuevamente.',
+  passwordChange: 'Tenés que cambiar tu contraseña para continuar.',
 }
 
 // Mensaje visible para el usuario según el status de /scan/dns. En 403 se muestra el
@@ -20,6 +21,7 @@ export function scanErrorMessage(status, body) {
   if (status === 429) return MESSAGES[429]
   if (status === 401) return MESSAGES[401]
   if (status === 403) {
+    if (body?.error === 'password_change_required' || body?.error === 'temp_password_expired') return MESSAGES.passwordChange
     const msg = typeof body?.error === 'string' ? body.error.trim() : ''
     return msg && msg.length <= 160 ? msg : MESSAGES.forbidden
   }

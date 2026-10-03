@@ -74,6 +74,11 @@ describe('requestScan', () => {
     expect((await call(jsonRes(200, { ok: false })).run()).ok).toBe(false)
   })
 
+  it('403 por contraseña temporal pendiente → mensaje propio, nunca el código crudo', () => {
+    expect(scanErrorMessage(403, { error: 'password_change_required' })).toBe('Tenés que cambiar tu contraseña para continuar.')
+    expect(scanErrorMessage(403, { error: 'temp_password_expired' })).toBe('Tenés que cambiar tu contraseña para continuar.')
+  })
+
   it('401 → sesión expirada', () => {
     expect(scanErrorMessage(401, {})).toBe('Tu sesión expiró. Volvé a iniciar sesión.')
   })

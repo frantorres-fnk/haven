@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 vi.mock('../supabase', () => ({ supabase: {} }))
-const { normalizeDomain, normalizeDomainInput, DOMAIN_RE, primaryDomainPayload, createPrimaryDomain, sendDomainVerification, requestBrandHint, onboardingDomainView, domainInsertErrorMessage } = await import('../domains')
+const { normalizeDomain, normalizeDomainInput, DOMAIN_RE, primaryDomainPayload, createPrimaryDomain, sendDomainVerification, requestBrandHint, onboardingDomainView, domainInsertErrorMessage, preBaselineState, canRequestManualScan, firstAnalysisProgress } = await import('../domains')
 const { SCANNER_URL } = await import('../scan')
 
 const sessionClient = (token = 'tok-1') => ({ auth: { getSession: async () => ({ data: { session: { access_token: token } } }) } })
@@ -164,5 +164,51 @@ describe('onboarding de org existente (/onboarding/domain)', () => {
 
   it('ruta protegida por el guard', () => {
     expect(src('App.jsx')).toMatch(/path="\/onboarding\/domain" element={<RequireAccount><OnboardingDomain \/><\/RequireAccount>}/)
+  })
+})
+
+describe('Dashboard antes del primer análisis', () => {
+  it('estados: sin dominio, confirmación pendiente, primer análisis en curso, con resultados', () => {
+    expect(preBaselineState({ domain: null, scan: null })).toBe('no_domain')
+    expect(preBaselineState({ domain: { verified: false }, scan: null })).toBe('pending_confirmation')
+    expect(preBaselineState({ domain: { verified: true }, scan: null })).toBe('first_analysis')
+    expect(preBaselineState({ domain: { verified: true }, scan: { id: 's1' } })).toBeNull()
+  })
+
+  it('"Analizar ahora" solo con dominio confirmado y rol owner/admin', () => {
+    expect(canRequestManualScan({ domain: null, role: 'owner' })).toBe(false)
+    expect(canRequestManualScan({ domain: { verified: false }, role: 'owner' })).toBe(false)
+    expect(canRequestManualScan({ domain: { verified: true }, role: 'viewer' })).toBe(false)
+    expect(canRequestManualScan({ domain: { verified: true }, role: 'admin' })).toBe(true)
+  })
+
+  it('progreso del primer análisis desde domain_check_state', () => {
+    expect(firstAnalysisProgress([])).toEqual({ done: 0, total: 0 })
+    expect(firstAnalysisProgress([{ last_run_at: null }, { last_run_at: '2026-10-03T20:00:00Z' }])).toEqual({ done: 1, total: 2 })
+    expect(firstAnalysisProgress(undefined)).toEqual({ done: 0, total: 0 })
+  })
+
+  const here = dirname(fileURLToPath(import.meta.url))
+  const src = (p) => readFileSync(join(here, '../..', p), 'utf8')
+
+  it('Dashboard: sin "Tu dominio está listo" ni "Iniciar primer scan"; CTA, confirmación con reenviar y primer análisis', () => {
+    const d = src('pages/Dashboard.jsx')
+    expect(d).not.toMatch(/Tu dominio está listo/)
+    expect(d).not.toMatch(/Iniciar primer scan/)
+    expect(d).toMatch(/navigate\('\/onboarding\/domain'\)/)
+    expect(d).toMatch(/Te enviamos un mail para confirmar \{domain\.domain\}/)
+    expect(d).toMatch(/<ResendVerificationButton domainId=\{domain\.id\}/)
+    expect(d).toMatch(/Primer análisis en curso/)
+    expect(d).toMatch(/canRequestManualScan\(\{ domain, role: orgRole \}\) && \(/)
+    expect(d).toMatch(/navigate\('\/account'\)/)
+  })
+
+  it('Verify.jsx: solo cambia el copy; sigue llamando a /verify y no dispara scan', () => {
+    const v = src('pages/Verify.jsx')
+    expect(v).toMatch(/Dominio confirmado/)
+    expect(v).toMatch(/Tu primer análisis comienza en los próximos minutos/)
+    expect(v).not.toMatch(/Primer scan iniciado automáticamente/)
+    expect(v).toMatch(/\/verify\?token=\$\{token\}/)
+    expect(v).not.toMatch(/scan\/dns|requestScan/)
   })
 })

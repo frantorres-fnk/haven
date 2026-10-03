@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import { resolveMembership } from '../lib/membership'
 import { requestScan } from '../lib/scan'
 import { fetchCompletedScans, fetchOpenFindings, fetchScanHistory, fetchCheckStates } from '../lib/domainStats'
+import { preBaselineState, canRequestManualScan, firstAnalysisProgress } from '../lib/domains'
+import ResendVerificationButton from '../components/ResendVerificationButton'
 import Wordmark from '../components/Wordmark'
 import ScoreEvolution from '../components/ScoreEvolution'
 
@@ -957,6 +959,8 @@ export default function Dashboard() {
   const gradeNext    = nextGrade(score)
   const col          = scoreColors(score)
   const isTrial      = org?.status === 'trialing' && org?.billing_type !== 'manual_transfer'
+  const preBaseline  = preBaselineState({ domain, scan })
+  const firstProgress = firstAnalysisProgress(checkStates)
   const trialDays    = daysLeft(org?.trial_ends_at)
   const CIRC_COMP    = 2 * Math.PI * 33
 
@@ -1075,7 +1079,7 @@ export default function Dashboard() {
               ))}
             </div>
 
-            {orgRole !== 'viewer' && (
+            {canRequestManualScan({ domain, role: orgRole }) && (
               <button onClick={runScan} disabled={scanning} style={{
                 fontFamily: C.title, fontWeight: 600, fontSize: isMobile ? 12 : 13,
                 color: '#fff', background: scanning ? 'rgba(91,110,245,.5)' : C.accentGrad,
@@ -1083,6 +1087,16 @@ export default function Dashboard() {
                 borderRadius: 8, cursor: scanning ? 'not-allowed' : 'pointer',
               }}>
                 {scanning ? 'Analizando…' : 'Analizar ahora'}
+              </button>
+            )}
+
+            {!isMobile && (
+              <button onClick={() => navigate('/account')} style={{
+                fontFamily: C.body, fontSize: 13, color: C.t3,
+                background: 'none', border: `1px solid ${C.border}`,
+                padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+              }}>
+                Mi cuenta
               </button>
             )}
 
@@ -1141,27 +1155,67 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* NO SCAN */}
-          {!scan && !scanning && (
+          {/* ANTES DEL PRIMER ANÁLISIS: sin dominio / confirmación pendiente / primer análisis en curso */}
+          {!scanning && preBaseline && (
             <div style={{
               textAlign: 'center', padding: '64px 24px',
               border: `1px solid ${C.border}`, borderRadius: 18,
               background: C.card, marginBottom: 24,
             }}>
-              <Icon name="shield" size={40} color={C.accent} />
-              <h2 style={{ fontFamily: C.title, fontSize: 20, marginTop: 16, marginBottom: 8, color: C.t1 }}>
-                Tu dominio está listo para ser analizado
-              </h2>
-              <p style={{ color: C.t2, fontSize: 14, marginBottom: 24 }}>
-                Corré el primer scan para ver el estado real de tu empresa.
-              </p>
-              <button onClick={runScan} disabled={scanning} style={{
-                background: C.accentGrad, color: '#fff', border: 'none',
-                borderRadius: 10, padding: '12px 28px',
-                fontSize: 15, fontWeight: 700, fontFamily: C.title, cursor: 'pointer',
-              }}>
-                Iniciar primer scan →
-              </button>
+              {preBaseline === 'no_domain' && (
+                <>
+                  <Icon name="globe" size={40} color={C.accent} />
+                  <h2 style={{ fontFamily: C.title, fontSize: 20, marginTop: 16, marginBottom: 8, color: C.t1 }}>
+                    Agregá tu dominio
+                  </h2>
+                  <p style={{ color: C.t2, fontSize: 14, marginBottom: orgRole === 'owner' ? 24 : 0 }}>
+                    {orgRole === 'owner'
+                      ? 'Es el dominio de tu empresa que HAVEN va a monitorear.'
+                      : 'El owner de tu organización todavía no agregó el dominio.'}
+                  </p>
+                  {orgRole === 'owner' && (
+                    <button onClick={() => navigate('/onboarding/domain')} style={{
+                      background: C.accentGrad, color: '#fff', border: 'none',
+                      borderRadius: 10, padding: '12px 28px',
+                      fontSize: 15, fontWeight: 700, fontFamily: C.title, cursor: 'pointer',
+                    }}>
+                      Agregá tu dominio →
+                    </button>
+                  )}
+                </>
+              )}
+
+              {preBaseline === 'pending_confirmation' && (
+                <>
+                  <Icon name="mail" size={40} color={C.accent} />
+                  <h2 style={{ fontFamily: C.title, fontSize: 20, marginTop: 16, marginBottom: 8, color: C.t1 }}>
+                    Te enviamos un mail para confirmar {domain.domain}
+                  </h2>
+                  <p style={{ color: C.t2, fontSize: 14, marginBottom: orgRole === 'owner' ? 24 : 0 }}>
+                    Cuando el dominio quede confirmado, tu primer análisis comienza en los próximos minutos.
+                  </p>
+                  {orgRole === 'owner' && (
+                    <ResendVerificationButton domainId={domain.id} style={{
+                      background: 'none', color: C.t1, border: `1px solid ${C.border}`,
+                      borderRadius: 10, padding: '10px 22px',
+                      fontSize: 14, fontWeight: 600, fontFamily: C.title,
+                    }} />
+                  )}
+                </>
+              )}
+
+              {preBaseline === 'first_analysis' && (
+                <>
+                  <Icon name="eye" size={40} color={C.accent} />
+                  <h2 style={{ fontFamily: C.title, fontSize: 20, marginTop: 16, marginBottom: 8, color: C.t1 }}>
+                    Primer análisis en curso
+                    {firstProgress.total > 0 && ` · ${firstProgress.done} de ${firstProgress.total} controles`}
+                  </h2>
+                  <p style={{ color: C.t2, fontSize: 14 }}>
+                    Tu dominio ya está confirmado. Los resultados aparecen acá en los próximos minutos.
+                  </p>
+                </>
+              )}
             </div>
           )}
 
@@ -2053,11 +2107,28 @@ export default function Dashboard() {
                   borderRadius: 12, padding: '14px 18px',
                 }}>
                   <Icon name="info" size={16} color={C.amberText} sw={1.5} />
-                  <p style={{ fontSize: 13, color: C.t2, margin: 0, lineHeight: 1.6 }}>
-                    <b style={{ color: C.t1 }}>Verificá tu dominio</b> para activar el monitoreo.
-                    Revisá tu mail en <b style={{ color: C.link, fontFamily: C.mono }}>{org?.email}</b>.
+                  <p style={{ flex: 1, fontSize: 13, color: C.t2, margin: 0, lineHeight: 1.6 }}>
+                    <b style={{ color: C.t1 }}>Te enviamos un mail para confirmar {domain.domain}</b>.
+                    Cuando lo confirmes, el monitoreo se activa.
                   </p>
+                  {orgRole === 'owner' && (
+                    <ResendVerificationButton domainId={domain.id} style={{
+                      background: 'none', color: C.t1, border: `1px solid ${C.border}`,
+                      borderRadius: 8, padding: '6px 12px', fontSize: 12, fontFamily: C.body,
+                    }} />
+                  )}
                 </div>
+              )}
+
+              {isMobile && (
+                <button onClick={() => navigate('/account')} style={{
+                  width: '100%', marginTop: 24,
+                  fontFamily: C.body, fontSize: 13, color: C.t3,
+                  background: 'none', border: `1px solid ${C.border}`,
+                  padding: '12px', borderRadius: 10, cursor: 'pointer',
+                }}>
+                  Mi cuenta
+                </button>
               )}
 
               {isMobile && (

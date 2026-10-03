@@ -110,3 +110,25 @@ export function domainInsertErrorMessage(error) {
   if (error?.code === '42501' || /row-level security/i.test(msg)) return 'No tenés permisos para agregar el dominio.'
   return 'No pudimos agregar el dominio. Intentá nuevamente.'
 }
+
+// Estado del Dashboard antes del primer análisis (null = ya hay resultados)
+//   no_domain            → CTA "Agregá tu dominio"
+//   pending_confirmation → "Te enviamos un mail para confirmar <dominio>" + reenviar; sin Analizar
+//   first_analysis       → "Primer análisis en curso" (lo toma el scheduler en el próximo tick)
+export function preBaselineState({ domain, scan }) {
+  if (!domain) return 'no_domain'
+  if (!domain.verified) return 'pending_confirmation'
+  if (!scan) return 'first_analysis'
+  return null
+}
+
+// "Analizar ahora" solo tiene sentido con un dominio confirmado
+export function canRequestManualScan({ domain, role }) {
+  return role !== 'viewer' && !!domain?.verified
+}
+
+// Progreso del primer análisis según domain_check_state (filas ya ejecutadas)
+export function firstAnalysisProgress(checkStates) {
+  const rows = Array.isArray(checkStates) ? checkStates : []
+  return { done: rows.filter(r => r?.last_run_at).length, total: rows.length }
+}

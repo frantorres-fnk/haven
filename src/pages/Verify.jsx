@@ -57,12 +57,11 @@ export default function Verify() {
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             </div>
-            <h2 style={{ ...s.title, color: '#4F7EFF' }}>¡Dominio verificado!</h2>
-            <p style={s.sub}>Tu monitoreo está activo. Te redirigimos al portal en unos segundos.</p>
+            <h2 style={{ ...s.title, color: '#4F7EFF' }}>Dominio confirmado</h2>
+            <p style={s.sub}>Tu primer análisis comienza en los próximos minutos.</p>
             <div style={s.infoBox}>
               <p style={{ fontSize: 13, color: '#93A1BC', margin: 0 }}>
-                ✅ Monitoreo activo · 24/7<br/>
-                🔍 Primer scan iniciado automáticamente
+                ✅ Monitoreo activo · 24/7
               </p>
             </div>
             <button style={s.btn} onClick={() => navigate('/dashboard')}>

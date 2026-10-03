@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { resolveMembership } from './membership'
-import { classifyAuthError, isSessionInvalid } from './authErrors'
+import { isSessionInvalid } from './authErrors'
 import { SCANNER_URL } from './scan'
 
 // Debe coincidir con el Worker (POST /account/password)
@@ -87,50 +87,48 @@ export function passwordProblem(newPassword, { email, currentPassword, confirm }
 }
 
 const WORKER_MESSAGES = {
-  same_password:         'La nueva contraseña debe ser distinta de la actual.',
-  reauth_required:       'Volvé a ingresar tu contraseña actual.',
-  temp_password_expired: 'Tu contraseña temporal venció. Pedile una nueva a Fenikso.',
-  too_short:             `La nueva contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`,
-  too_long:              'La nueva contraseña es demasiado larga.',
-  contains_email:        'La nueva contraseña no puede contener tu email.',
-  policy:                'La nueva contraseña no cumple la política de seguridad.',
-  service:               'No pudimos cambiar la contraseña. Intentá nuevamente.',
-  network:               'No pudimos conectar con el servicio. Intentá nuevamente.',
+  current_password_invalid:  'La contraseña actual no es correcta.',
+  current_password_required: 'Ingresá tu contraseña actual.',
+  too_many_attempts:         'Demasiados intentos. Esperá unos minutos y volvé a probar.',
+  same_password:             'La nueva contraseña debe ser distinta de la actual.',
+  temp_password_expired:     'Tu contraseña temporal venció. Pedile una nueva a Fenikso.',
+  too_short:                 `La nueva contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`,
+  too_long:                  'La nueva contraseña es demasiado larga.',
+  contains_email:            'La nueva contraseña no puede contener tu email.',
+  policy:                    'La nueva contraseña no cumple la política de seguridad.',
+  session:                   'Tu sesión expiró. Volvé a iniciar sesión.',
+  service:                   'No pudimos cambiar la contraseña. Intentá nuevamente.',
+  network:                   'No pudimos conectar con el servicio. Intentá nuevamente.',
 }
 
 /**
- * Cambio de contraseña (primer login y voluntario). Nunca lanza; nunca guarda ni
+ * Cambio de contraseña (primer login y Mi cuenta). Nunca lanza; nunca guarda ni
  * loguea contraseñas.
- *   1. Prueba la contraseña actual con un login real (rate limit nativo de Supabase).
- *   2. Con ese token recién emitido llama a POST /account/password (el Worker exige
- *      una autenticación por contraseña reciente).
- *   3. Refresca la sesión para que el JWT deje de traer el flag.
+ *   1. POST /account/password { current_password, new_password, revoke_other_sessions }
+ *      con la sesión actual: el Worker verifica la contraseña actual contra
+ *      Supabase Auth (una sesión sola no alcanza).
+ *   2. Refresca la sesión para que el JWT deje de traer el flag.
  */
 export async function changePassword({ email, currentPassword, newPassword, revokeOthers = true }, { client = supabase, fetchImpl = fetch } = {}) {
+  if (!currentPassword) return { ok: false, error: WORKER_MESSAGES.current_password_required }
   const problem = passwordProblem(newPassword, { email, currentPassword })
   if (problem) return { ok: false, error: problem }
-  if (!currentPassword) return { ok: false, error: 'Ingresá tu contraseña actual.' }
 
-  let signIn
+  let token
   try {
-    signIn = await client.auth.signInWithPassword({ email, password: currentPassword })
-  } catch (e) {
-    signIn = { error: e }
+    const { data } = await client.auth.getSession()
+    token = data?.session?.access_token
+  } catch {
+    token = undefined
   }
-  if (signIn.error) {
-    const kind = classifyAuthError(signIn.error)
-    if (kind === 'invalid_credentials') return { ok: false, error: 'La contraseña actual no es correcta.' }
-    if (kind === 'rate_limited') return { ok: false, error: 'Demasiados intentos. Esperá unos minutos y volvé a probar.' }
-    return { ok: false, error: WORKER_MESSAGES.service }
-  }
-  const token = signIn.data?.session?.access_token
+  if (!token) return { ok: false, error: WORKER_MESSAGES.session }
 
   let res
   try {
     res = await fetchImpl(`${SCANNER_URL}/account/password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ new_password: newPassword, revoke_other_sessions: revokeOthers }),
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword, revoke_other_sessions: revokeOthers }),
     })
   } catch {
     return { ok: false, error: WORKER_MESSAGES.network }
@@ -142,6 +140,7 @@ export async function changePassword({ email, currentPassword, newPassword, revo
     try { await client.auth.refreshSession() } catch { /* el guard relee el usuario igual */ }
     return { ok: true }
   }
+  if (res.status === 401) return { ok: false, error: WORKER_MESSAGES.session }
   const code = body?.error === 'weak_password' ? body?.reason : body?.error
   return { ok: false, error: WORKER_MESSAGES[code] ?? WORKER_MESSAGES.service }
 }

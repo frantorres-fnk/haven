@@ -117,49 +117,52 @@ describe('passwordProblem (validación local, espejo del Worker)', () => {
 
 describe('changePassword', () => {
   const args = { email: 'damian@openit.com.ar', currentPassword: 'Temporal-Inicial-2026!', newPassword: 'Nueva-Segura-Larga-99' }
+  const withSession = (c, token = 'sess-token') => ({ ...c, auth: { ...c.auth, getSession: async () => ({ data: { session: token ? { access_token: token } : null } }) } })
 
-  it('cambio exitoso: reautentica con la actual, llama al Worker con el token NUEVO y refresca la sesión', async () => {
-    const c = fakeClient()
+  it('cambio exitoso: manda current_password + new_password con la sesión actual y refresca', async () => {
+    const c = withSession(fakeClient())
     const fetchImpl = vi.fn(async () => jsonRes(200, { ok: true, others_revoked: true }))
     expect(await changePassword(args, { client: c, fetchImpl })).toEqual({ ok: true })
-    expect(c.calls.signIn).toEqual([{ email: args.email, password: args.currentPassword }])
     const [url, init] = fetchImpl.mock.calls[0]
     expect(url).toBe(`${SCANNER_URL}/account/password`)
-    expect(init.headers.Authorization).toBe('Bearer fresh-token')
-    expect(JSON.parse(init.body)).toEqual({ new_password: args.newPassword, revoke_other_sessions: true })
+    expect(init.headers.Authorization).toBe('Bearer sess-token')
+    expect(JSON.parse(init.body)).toEqual({ current_password: args.currentPassword, new_password: args.newPassword, revoke_other_sessions: true })
+    expect(c.calls.signIn).toEqual([])      // la verificación de la actual la hace el Worker
     expect(c.calls.refresh).toBe(1)
   })
 
-  it('contraseña actual incorrecta → mensaje claro y no llama al Worker', async () => {
-    const c = fakeClient({ signIn: () => ({ data: {}, error: { status: 400, code: 'invalid_credentials' } }) })
+  it('contraseña actual vacía → no llama al Worker', async () => {
     const fetchImpl = vi.fn()
-    expect(await changePassword(args, { client: c, fetchImpl })).toEqual({ ok: false, error: 'La contraseña actual no es correcta.' })
+    expect(await changePassword({ ...args, currentPassword: '' }, { client: withSession(fakeClient()), fetchImpl }))
+      .toEqual({ ok: false, error: 'Ingresá tu contraseña actual.' })
     expect(fetchImpl).not.toHaveBeenCalled()
   })
 
-  it('demasiados intentos (rate limit de Supabase) → mensaje de espera', async () => {
-    const c = fakeClient({ signIn: () => ({ data: {}, error: { status: 429 } }) })
-    expect((await changePassword(args, { client: c, fetchImpl: vi.fn() })).error).toMatch(/Demasiados intentos/)
+  it('validación local corta antes de llamar', async () => {
+    const fetchImpl = vi.fn()
+    expect((await changePassword({ ...args, newPassword: 'corta' }, { client: withSession(fakeClient()), fetchImpl })).ok).toBe(false)
+    expect(fetchImpl).not.toHaveBeenCalled()
   })
 
-  it('validación local corta antes de cualquier llamada', async () => {
-    const c = fakeClient()
-    const r = await changePassword({ ...args, newPassword: 'corta' }, { client: c, fetchImpl: vi.fn() })
-    expect(r.ok).toBe(false)
-    expect(c.calls.signIn).toEqual([])
+  it('sin sesión → mensaje de sesión expirada', async () => {
+    const r = await changePassword(args, { client: withSession(fakeClient(), null), fetchImpl: vi.fn() })
+    expect(r.error).toMatch(/sesión expiró/)
   })
 
   it('errores del Worker → mensajes sin detalles técnicos; sin refresh', async () => {
     const cases = [
+      [400, { error: 'current_password_invalid' }, /contraseña actual no es correcta/],
+      [400, { error: 'current_password_required' }, /Ingresá tu contraseña actual/],
+      [429, { error: 'too_many_attempts' }, /Demasiados intentos/],
       [403, { error: 'temp_password_expired' }, /venció/],
       [400, { error: 'same_password' }, /distinta/],
       [400, { error: 'weak_password', reason: 'contains_email' }, /email/],
-      [401, { error: 'reauth_required' }, /contraseña actual/],
+      [401, { error: 'Token inválido' }, /sesión expiró/],
       [503, { error: 'auth_unavailable' }, /No pudimos cambiar/],
       [500, { error: 'stack trace…' }, /No pudimos cambiar/],
     ]
     for (const [status, body, msg] of cases) {
-      const c = fakeClient()
+      const c = withSession(fakeClient())
       const r = await changePassword(args, { client: c, fetchImpl: async () => jsonRes(status, body) })
       expect(r.ok).toBe(false)
       expect(r.error).toMatch(msg)
@@ -168,7 +171,7 @@ describe('changePassword', () => {
   })
 
   it('error de red → mensaje de conexión, no lanza', async () => {
-    const r = await changePassword(args, { client: fakeClient(), fetchImpl: async () => { throw new TypeError('Failed to fetch') } })
+    const r = await changePassword(args, { client: withSession(fakeClient()), fetchImpl: async () => { throw new TypeError('Failed to fetch') } })
     expect(r).toEqual({ ok: false, error: 'No pudimos conectar con el servicio. Intentá nuevamente.' })
   })
 })

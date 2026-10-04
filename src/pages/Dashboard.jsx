@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { resolveMembership } from '../lib/membership'
 import { requestScan } from '../lib/scan'
 import { fetchCompletedScans, fetchOpenFindings, fetchScanHistory, fetchCheckStates } from '../lib/domainStats'
-import { preBaselineState, canRequestManualScan, firstAnalysisProgress } from '../lib/domains'
+import { preBaselineState, canRequestManualScan } from '../lib/domains'
 import ResendVerificationButton from '../components/ResendVerificationButton'
 import Wordmark from '../components/Wordmark'
 import ScoreEvolution from '../components/ScoreEvolution'
@@ -960,7 +960,6 @@ export default function Dashboard() {
   const col          = scoreColors(score)
   const isTrial      = org?.status === 'trialing' && org?.billing_type !== 'manual_transfer'
   const preBaseline  = preBaselineState({ domain, scan })
-  const firstProgress = firstAnalysisProgress(checkStates)
   const trialDays    = daysLeft(org?.trial_ends_at)
   const CIRC_COMP    = 2 * Math.PI * 33
 
@@ -1209,7 +1208,6 @@ export default function Dashboard() {
                   <Icon name="eye" size={40} color={C.accent} />
                   <h2 style={{ fontFamily: C.title, fontSize: 20, marginTop: 16, marginBottom: 8, color: C.t1 }}>
                     Primer análisis en curso
-                    {firstProgress.total > 0 && ` · ${firstProgress.done} de ${firstProgress.total} controles`}
                   </h2>
                   <p style={{ color: C.t2, fontSize: 14 }}>
                     Tu dominio ya está confirmado. Los resultados aparecen acá en los próximos minutos.

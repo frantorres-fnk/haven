@@ -126,9 +126,3 @@ export function preBaselineState({ domain, scan }) {
 export function canRequestManualScan({ domain, role }) {
   return role !== 'viewer' && !!domain?.verified
 }
-
-// Progreso del primer análisis según domain_check_state (filas ya ejecutadas)
-export function firstAnalysisProgress(checkStates) {
-  const rows = Array.isArray(checkStates) ? checkStates : []
-  return { done: rows.filter(r => r?.last_run_at).length, total: rows.length }
-}

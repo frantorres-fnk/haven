@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 vi.mock('../supabase', () => ({ supabase: {} }))
-const { normalizeDomain, normalizeDomainInput, DOMAIN_RE, primaryDomainPayload, createPrimaryDomain, sendDomainVerification, requestBrandHint, onboardingDomainView, domainInsertErrorMessage, preBaselineState, canRequestManualScan, firstAnalysisProgress } = await import('../domains')
+const { normalizeDomain, normalizeDomainInput, DOMAIN_RE, primaryDomainPayload, createPrimaryDomain, sendDomainVerification, requestBrandHint, onboardingDomainView, domainInsertErrorMessage, preBaselineState, canRequestManualScan } = await import('../domains')
 const { SCANNER_URL } = await import('../scan')
 
 const sessionClient = (token = 'tok-1') => ({ auth: { getSession: async () => ({ data: { session: { access_token: token } } }) } })
@@ -182,12 +182,6 @@ describe('Dashboard antes del primer análisis', () => {
     expect(canRequestManualScan({ domain: { verified: true }, role: 'admin' })).toBe(true)
   })
 
-  it('progreso del primer análisis desde domain_check_state', () => {
-    expect(firstAnalysisProgress([])).toEqual({ done: 0, total: 0 })
-    expect(firstAnalysisProgress([{ last_run_at: null }, { last_run_at: '2026-10-03T20:00:00Z' }])).toEqual({ done: 1, total: 2 })
-    expect(firstAnalysisProgress(undefined)).toEqual({ done: 0, total: 0 })
-  })
-
   const here = dirname(fileURLToPath(import.meta.url))
   const src = (p) => readFileSync(join(here, '../..', p), 'utf8')
 
@@ -199,6 +193,7 @@ describe('Dashboard antes del primer análisis', () => {
     expect(d).toMatch(/Te enviamos un mail para confirmar \{domain\.domain\}/)
     expect(d).toMatch(/<ResendVerificationButton domainId=\{domain\.id\}/)
     expect(d).toMatch(/Primer análisis en curso/)
+    expect(d).not.toMatch(/controles`\}/)                     // sin "X de N" en esta fase
     expect(d).toMatch(/canRequestManualScan\(\{ domain, role: orgRole \}\) && \(/)
     expect(d).toMatch(/navigate\('\/account'\)/)
   })

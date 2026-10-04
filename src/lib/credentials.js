@@ -44,7 +44,11 @@ export function credentialCardState(summary) {
   const pending = Number(summary.pending) || 0
   if (pending > 0) {
     const severity = SEVERITIES.find(s => (Number(summary[s]) || 0) > 0) ?? 'medium'
-    return { status: 'exposed', text: pending === 1 ? '1 credencial expuesta' : `${pending} credenciales expuestas`, count: pending, severity }
+    const out = { status: 'exposed', text: pending === 1 ? '1 credencial expuesta' : `${pending} credenciales expuestas`, count: pending, severity }
+    // Nuevas detecciones de la última corrida completa (solo después del baseline)
+    const fresh = summary.baseline_completed ? Number(summary.new_last_run) || 0 : 0
+    if (fresh > 0) out.newText = fresh === 1 ? '1 nueva desde el último análisis' : `${fresh} nuevas desde el último análisis`
+    return out
   }
   if (!summary.last_run_at || !summary.last_status) return { status: 'analyzing', text: 'Analizando…' }
   if (summary.last_status === 'pass') return { status: 'ok', text: 'Sin credenciales expuestas pendientes' }
@@ -62,6 +66,12 @@ export function credentialAreaStatus(card) {
 export const SOURCE_TYPE_LABEL = { stealer: 'Malware (infostealer)', breach: 'Filtración', combolist: 'Recopilación', unknown: 'Filtración' }
 export const SEVERITY_LABEL = { critical: 'Crítica', high: 'Alta', medium: 'Media', low: 'Baja' }
 export const REMEDIATION_LABEL = { open: 'Pendiente', in_progress: 'En curso', remediated: 'Remediada', false_positive: 'Falso positivo', risk_accepted: 'Riesgo aceptado' }
+
+// Nuevas detecciones primero; después el histórico (análisis inicial)
+export function splitExposures(rows) {
+  const list = Array.isArray(rows) ? rows : []
+  return { fresh: list.filter(r => r.detection_kind === 'new'), historical: list.filter(r => r.detection_kind !== 'new') }
+}
 
 export function formatExposureDate(row) {
   if (!row?.breach_date) return '—'

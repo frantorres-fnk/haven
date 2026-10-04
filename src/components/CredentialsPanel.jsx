@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  fetchCredentialExposures, formatExposureDate, SOURCE_TYPE_LABEL, SEVERITY_LABEL, REMEDIATION_LABEL,
+  fetchCredentialExposures, formatExposureDate, splitExposures, SOURCE_TYPE_LABEL, SEVERITY_LABEL, REMEDIATION_LABEL,
 } from '../lib/credentials'
 
 const K = {
@@ -41,25 +41,51 @@ export default function CredentialsPanel({ domainId, domainName, summaryText, on
           <p style={{ color: K.t2, fontSize: 13 }}>No hay credenciales expuestas registradas para este dominio.</p>
         )}
 
-        {state.rows.map(r => (
-          <div key={r.id} style={{ border: `1px solid ${K.border}`, borderLeft: `3px solid ${SEV_COLOR[r.severity] ?? K.t3}`, borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
-              <span style={{ fontFamily: K.mono, fontSize: 13, color: K.t1, wordBreak: 'break-all' }}>{r.identity}</span>
-              <span style={{ display: 'flex', gap: 8, fontSize: 11, fontFamily: K.mono }}>
-                <span style={{ color: SEV_COLOR[r.severity] ?? K.t2 }}>{SEVERITY_LABEL[r.severity] ?? r.severity}</span>
-                <span style={{ color: r.remediation_status === 'remediated' ? K.green : K.t2 }}>· {REMEDIATION_LABEL[r.remediation_status] ?? r.remediation_status}</span>
-              </span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '6px 16px', fontSize: 12, color: K.t2 }}>
-              <Field label="Tipo" value={SOURCE_TYPE_LABEL[r.source_type] ?? 'Filtración'} />
-              <Field label="Fuente" value={r.source_name || '—'} />
-              <Field label="Fecha" value={formatExposureDate(r)} />
-              {r.origin && <Field label="Origen" value={r.origin} />}
-              <Field label="Contraseña" value={r.password_exposed ? '••••••••  Contraseña expuesta: Sí' : 'Contraseña expuesta: No'} strong={r.password_exposed} />
-              <Field label="Detectada" value={r.first_seen_at ? new Date(r.first_seen_at).toLocaleDateString('es-AR') : '—'} />
-            </div>
-          </div>
-        ))}
+        {!state.loading && state.ok && (() => {
+          const { fresh, historical } = splitExposures(state.rows)
+          return (
+            <>
+              {fresh.length > 0 && (
+                <Section title="Nuevas detecciones" sub="Exposiciones que HAVEN detectó después del análisis inicial. La fecha de exposición puede ser anterior." rows={fresh} />
+              )}
+              {historical.length > 0 && (
+                <Section title="Exposiciones históricas" sub="Detectadas en el análisis inicial. No son filtraciones nuevas: revisá la fecha de exposición de cada una." rows={historical} />
+              )}
+            </>
+          )
+        })()}
+      </div>
+    </div>
+  )
+}
+
+function Section({ title, sub, rows }) {
+  return (
+    <section style={{ marginBottom: 18 }}>
+      <h3 style={{ fontFamily: K.title, fontSize: 15, color: K.t1, margin: '0 0 2px' }}>{title} <span style={{ color: K.t3, fontWeight: 400 }}>· {rows.length}</span></h3>
+      <p style={{ fontSize: 12, color: K.t3, margin: '0 0 10px' }}>{sub}</p>
+      {rows.map(r => <ExposureRow key={r.id} r={r} />)}
+    </section>
+  )
+}
+
+function ExposureRow({ r }) {
+  return (
+    <div style={{ border: `1px solid ${K.border}`, borderLeft: `3px solid ${SEV_COLOR[r.severity] ?? K.t3}`, borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+        <span style={{ fontFamily: K.mono, fontSize: 13, color: K.t1, wordBreak: 'break-all' }}>{r.identity}</span>
+        <span style={{ display: 'flex', gap: 8, fontSize: 11, fontFamily: K.mono }}>
+          <span style={{ color: SEV_COLOR[r.severity] ?? K.t2 }}>{SEVERITY_LABEL[r.severity] ?? r.severity}</span>
+          <span style={{ color: r.remediation_status === 'remediated' ? K.green : K.t2 }}>· {REMEDIATION_LABEL[r.remediation_status] ?? r.remediation_status}</span>
+        </span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '6px 16px', fontSize: 12, color: K.t2 }}>
+        <Field label="Tipo" value={SOURCE_TYPE_LABEL[r.source_type] ?? 'Filtración'} />
+        <Field label="Fuente" value={r.source_name || '—'} />
+        <Field label="Fecha de exposición" value={formatExposureDate(r)} />
+        {r.origin && <Field label="Origen" value={r.origin} />}
+        <Field label="Contraseña" value={r.password_exposed ? '••••••••  Contraseña expuesta: Sí' : 'Contraseña expuesta: No'} strong={r.password_exposed} />
+        <Field label="Detectada en HAVEN" value={r.first_seen_at ? new Date(r.first_seen_at).toLocaleDateString('es-AR') : '—'} />
       </div>
     </div>
   )

@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 vi.mock('../supabase', () => ({ supabase: {} }))
-const { credentialCardState, credentialAreaStatus, fetchCredentialSummary, fetchCredentialExposures, formatExposureDate } = await import('../credentials')
+const { credentialCardState, credentialAreaStatus, fetchCredentialSummary, fetchCredentialExposures, formatExposureDate, splitExposures } = await import('../credentials')
 
 const S = (over = {}) => ({ eligible: true, reason: 'eligible', last_status: null, last_run_at: null, pending: 0, critical: 0, high: 0, medium: 0, low: 0, ...over })
 
@@ -112,5 +112,47 @@ describe('UI: tarjeta y detalle', () => {
     const files = walk(join(here, '../..'))
     expect(files.length).toBeGreaterThan(10)
     for (const f of files) expect([f, /leakcheck/i.test(readFileSync(f, 'utf8'))]).toEqual([f, false])
+  })
+})
+
+describe('baseline histórico vs. nuevas detecciones', () => {
+  const X = (over) => S({ last_status: 'fail', last_run_at: 'x', pending: 12, high: 12, baseline_completed: true, total: 12, new_last_run: 0, ...over })
+
+  it('después del baseline, sin novedades: solo "N credenciales expuestas"', () => {
+    const c = credentialCardState(X())
+    expect(c.text).toBe('12 credenciales expuestas')
+    expect(c.newText).toBeUndefined()
+  })
+
+  it('con nuevas detecciones de la última corrida: segunda línea "X nuevas desde el último análisis"', () => {
+    expect(credentialCardState(X({ new_last_run: 2 })).newText).toBe('2 nuevas desde el último análisis')
+    expect(credentialCardState(X({ new_last_run: 1 })).newText).toBe('1 nueva desde el último análisis')
+  })
+
+  it('en el baseline (o sin baseline completo) nunca se presentan como nuevas', () => {
+    expect(credentialCardState(X({ baseline_completed: false, new_last_run: 5 })).newText).toBeUndefined()
+  })
+
+  it('splitExposures: nuevas primero, el resto es histórico', () => {
+    const { fresh, historical } = splitExposures([{ id: 1, detection_kind: 'baseline' }, { id: 2, detection_kind: 'new' }, { id: 3 }])
+    expect(fresh.map(r => r.id)).toEqual([2])
+    expect(historical.map(r => r.id)).toEqual([1, 3])
+    expect(splitExposures(undefined)).toEqual({ fresh: [], historical: [] })
+  })
+
+  const here = dirname(fileURLToPath(import.meta.url))
+  const src = (p) => readFileSync(join(here, '../..', p), 'utf8')
+
+  it('detalle: secciones "Nuevas detecciones" antes de "Exposiciones históricas"; fecha de exposición ≠ detección en HAVEN', () => {
+    const p = src('components/CredentialsPanel.jsx')
+    expect(p.indexOf('title="Nuevas detecciones"')).toBeGreaterThan(0)
+    expect(p.indexOf('title="Nuevas detecciones"')).toBeLessThan(p.indexOf('title="Exposiciones históricas"'))
+    expect(p).toMatch(/label="Fecha de exposición"/)
+    expect(p).toMatch(/label="Detectada en HAVEN"/)
+    expect(p).not.toMatch(/filtración nueva/i)
+  })
+
+  it('tarjeta: muestra la segunda línea solo para Credenciales', () => {
+    expect(src('pages/Dashboard.jsx')).toMatch(/\{isCred && credCard\.newText && \(/)
   })
 })

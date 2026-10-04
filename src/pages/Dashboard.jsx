@@ -1537,6 +1537,9 @@ export default function Dashboard() {
                         <div style={{ fontFamily: C.mono, fontSize: 11, color: C.t3, lineHeight: 1.45 }}>
                           {sub}
                         </div>
+                        {isCred && credCard.newText && (
+                          <div style={{ fontFamily: C.mono, fontSize: 11, color: C.amberText, marginTop: 4 }}>{credCard.newText}</div>
+                        )}
                       </div>
                     )
                   })}

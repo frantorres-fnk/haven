@@ -5,6 +5,8 @@ import { resolveMembership } from '../lib/membership'
 import { requestScan } from '../lib/scan'
 import { fetchCompletedScans, fetchOpenFindings, fetchScanHistory, fetchCheckStates } from '../lib/domainStats'
 import { preBaselineState, canRequestManualScan } from '../lib/domains'
+import { fetchCredentialSummary, credentialCardState, credentialAreaStatus } from '../lib/credentials'
+import CredentialsPanel from '../components/CredentialsPanel'
 import ResendVerificationButton from '../components/ResendVerificationButton'
 import Wordmark from '../components/Wordmark'
 import ScoreEvolution from '../components/ScoreEvolution'
@@ -159,6 +161,7 @@ function timeSince(dateStr) {
 
 // Nombres de los controles del monitoreo continuo (check_id del worker)
 const CHECK_LABELS = {
+  credential_exposure: 'Credenciales expuestas',
   uptime: 'Disponibilidad', tls: 'HTTPS', headers: 'Headers de seguridad', apiexposure: 'APIs y archivos expuestos',
   spf: 'SPF', dmarc: 'DMARC', urlscan: 'Reputación (URLScan)', ssl: 'Certificado SSL',
   tech: 'Tecnologías expuestas', subdomains: 'Subdominios', typosquatting: 'Dominios similares',
@@ -261,8 +264,21 @@ function SevBadge({ sev }) {
 }
 
 // ─── Status badge ────────────────────────────────────────────────────────────────
-function StatusBadge({ status }) {
+function StatusBadge({ status, label }) {
   const isOk = status === 'ok'
+  if (status === 'neutral') {
+    return (
+      <span style={{
+        display: 'flex', alignItems: 'center', gap: 4,
+        fontFamily: C.mono, fontSize: 10, fontWeight: 600, letterSpacing: '.06em',
+        padding: '3px 8px', borderRadius: 20, textTransform: 'uppercase',
+        background: 'rgba(147,161,188,.1)', color: C.t3,
+      }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', display: 'inline-block', background: C.t3 }} />
+        {label ?? 'PENDIENTE'}
+      </span>
+    )
+  }
   return (
     <span style={{
       display: 'flex', alignItems: 'center', gap: 4,
@@ -740,6 +756,8 @@ export default function Dashboard() {
   const [removingId, setRemovingId] = useState(null)
 
   const [findingModal,    setFindingModal]    = useState(null) // finding object | null
+  const [credSummary,     setCredSummary]     = useState(undefined) // undefined = cargando
+  const [credOpen,        setCredOpen]        = useState(false)
 
   // ─── Org config (personalización) ─────────────────────────────────────────
   const [phrasesList,      setPhrasesList]      = useState([])
@@ -866,13 +884,15 @@ export default function Dashboard() {
   }
 
   async function loadLatestScan(domain_id) {
-    const [scans, history, states] = await Promise.all([
+    const [scans, history, states, cred] = await Promise.all([
       fetchCompletedScans(domain_id, 10),
       fetchScanHistory(domain_id),
       fetchCheckStates(domain_id),
+      fetchCredentialSummary(domain_id),
     ])
     setScanHistory(history)
     setCheckStates(states)
+    setCredSummary(cred)
 
     if (!scans.length) {
       setScan(null); setPrevScan(null); setFindings([]); return
@@ -948,7 +968,9 @@ export default function Dashboard() {
 
   // ─── Computed values ──────────────────────────────────────────────────────────
   const framework    = FRAMEWORKS[org?.industry] || FRAMEWORKS.general
-  const compControls = framework.controls.map(c => ({ ...c, ok: !findings.some(f => f.category === c.category) }))
+  // Credenciales: "cubierto" solo con una evaluación PASS real (nunca por ausencia de findings)
+  const credCard     = credentialCardState(credSummary)
+  const compControls = framework.controls.map(c => ({ ...c, ok: c.category === 'credentials' ? credCard.status === 'ok' : !findings.some(f => f.category === c.category) }))
   const compHit      = compControls.filter(c => c.ok).length
   const compTot      = compControls.length
   const compPct      = Math.round(compHit / compTot * 100)
@@ -964,6 +986,7 @@ export default function Dashboard() {
   const CIRC_COMP    = 2 * Math.PI * 33
 
   function areaStatus(category) {
+    if (category === 'credentials') return credentialAreaStatus(credCard)
     const f = findings.filter(f => f.category === category)
     if (f.some(x => x.severity === 'critical')) return 'crit'
     if (f.some(x => x.severity === 'high' || x.severity === 'medium')) return 'warn'
@@ -971,7 +994,7 @@ export default function Dashboard() {
   }
 
   const sortedAreas = [...SURFACE_AREAS].sort((a, b) => {
-    const order = { crit: 0, warn: 1, ok: 2 }
+    const order = { crit: 0, warn: 1, pending: 2, ok: 3 }
     return (order[areaStatus(a.category)] ?? 3) - (order[areaStatus(b.category)] ?? 3)
   })
 
@@ -1468,15 +1491,21 @@ export default function Dashboard() {
                 }}>
                   {sortedAreas.map((a, i) => {
                     const status = areaStatus(a.category)
-                    const isOk   = status === 'ok'
-                    const areaF  = findings.filter(f => f.category === a.category)
-                    const sub    = view === 'owner'
+                    const isCred = a.category === 'credentials'
+                    // Neutral (sin evaluación válida): ni OK ni alerta
+                    const isOk   = status === 'ok' || status === 'pending'
+                    const areaF  = isCred ? [] : findings.filter(f => f.category === a.category)
+                    const sub    = isCred ? credCard.text : view === 'owner'
                       ? (areaF.length > 0 ? areaF[0].title_plain : a.subtitle)
                       : (areaF.length > 0 ? areaF[0].description_tech : a.subtitle)
+                    const onOpen = isCred
+                      ? (['exposed', 'ok', 'unknown'].includes(credCard.status) ? () => setCredOpen(true) : undefined)
+                      : (areaF.length > 0 ? () => setFindingModal(areaF) : undefined)
+                    const badgeLabel = { analyzing: 'ANALIZANDO', unknown: 'SIN DATOS', not_included: 'NO INCLUIDO', unavailable: 'N/D', pending: 'PENDIENTE' }[credCard.status]
 
                     return (
                       <div key={i}
-                        onClick={areaF.length > 0 ? () => setFindingModal(areaF) : undefined}
+                        onClick={onOpen}
                         style={{
                           background: C.card,
                           border: `1px solid ${isOk ? C.border : 'rgba(245,181,68,.25)'}`,
@@ -1484,20 +1513,20 @@ export default function Dashboard() {
                           borderRadius: 12, padding: '14px 14px',
                           opacity: isOk ? 0.8 : 1,
                           transition: 'opacity .2s, border-color .15s',
-                          cursor: areaF.length > 0 ? 'pointer' : 'default',
+                          cursor: onOpen ? 'pointer' : 'default',
                         }}
-                        onMouseEnter={areaF.length > 0 ? e => {
+                        onMouseEnter={onOpen ? e => {
                           e.currentTarget.style.borderColor = C.borderHi
                           e.currentTarget.style.opacity = '1'
                         } : undefined}
-                        onMouseLeave={areaF.length > 0 ? e => {
+                        onMouseLeave={onOpen ? e => {
                           e.currentTarget.style.borderColor = isOk ? C.border : 'rgba(245,181,68,.25)'
                           e.currentTarget.style.opacity = isOk ? '0.8' : '1'
                         } : undefined}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                           <Icon name={a.icon} size={16} color={isOk ? C.t3 : C.amberText} />
-                          <StatusBadge status={isOk ? 'ok' : 'review'} />
+                          <StatusBadge status={status === 'pending' ? 'neutral' : isOk ? 'ok' : 'review'} label={isCred ? badgeLabel : undefined} />
                         </div>
                         <div style={{
                           fontFamily: C.title, fontSize: 13, fontWeight: 600,
@@ -2144,6 +2173,10 @@ export default function Dashboard() {
 
         </div>
       </main>
+
+      {credOpen && domain && (
+        <CredentialsPanel domainId={domain.id} domainName={domain.domain} summaryText={credCard.text} onClose={() => setCredOpen(false)} />
+      )}
 
       {findingModal && (
         <FindingModal findings={findingModal} onClose={() => setFindingModal(null)} />

@@ -37,7 +37,7 @@ export async function fetchLatestScanCard(domainId) {
 export async function fetchCheckStates(domainId) {
   const { data, error } = await supabase
     .from('domain_check_state')
-    .select('check_id, last_status, last_run_at, last_valid_at, next_run_at')
+    .select('check_id, last_status, last_severity, last_valid_status, last_valid_severity, last_run_at, last_valid_at, next_run_at')
     .eq('domain_id', domainId)
   if (error || !data) return []
   return data

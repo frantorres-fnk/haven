@@ -6,6 +6,7 @@ import { requestScan } from '../lib/scan'
 import { fetchCompletedScans, fetchOpenFindings, fetchScanHistory, fetchCheckStates } from '../lib/domainStats'
 import { preBaselineState, canRequestManualScan } from '../lib/domains'
 import { fetchCredentialSummary, credentialCardState, credentialAreaStatus, credentialComplianceState, complianceSummary } from '../lib/credentials'
+import { surfaceAreaStatus } from '../lib/surface'
 import CredentialsPanel from '../components/CredentialsPanel'
 import ResendVerificationButton from '../components/ResendVerificationButton'
 import Wordmark from '../components/Wordmark'
@@ -994,12 +995,11 @@ export default function Dashboard() {
   const trialDays    = daysLeft(org?.trial_ends_at)
   const CIRC_COMP    = 2 * Math.PI * 33
 
+  // Tri-state real: OK solo con PASS (o último resultado válido PASS); UNKNOWN sin
+  // resultado válido o sin estado → neutral ("SIN DATOS"), nunca OK.
   function areaStatus(category) {
     if (category === 'credentials') return credentialAreaStatus(credCard)
-    const f = findings.filter(f => f.category === category)
-    if (f.some(x => x.severity === 'critical')) return 'crit'
-    if (f.some(x => x.severity === 'high' || x.severity === 'medium')) return 'warn'
-    return 'ok'
+    return surfaceAreaStatus(category, { findings, checkStates }).status
   }
 
   const sortedAreas = [...SURFACE_AREAS].sort((a, b) => {
@@ -1504,13 +1504,19 @@ export default function Dashboard() {
                     // Neutral (sin evaluación válida): ni OK ni alerta
                     const isOk   = status === 'ok' || status === 'pending'
                     const areaF  = isCred ? [] : findings.filter(f => f.category === a.category)
-                    const sub    = isCred ? credCard.text : view === 'owner'
-                      ? (areaF.length > 0 ? areaF[0].title_plain : a.subtitle)
-                      : (areaF.length > 0 ? areaF[0].description_tech : a.subtitle)
+                    const surf   = isCred ? null : surfaceAreaStatus(a.category, { findings, checkStates })
+                    const sub    = isCred ? credCard.text
+                      : surf.status === 'pending' && areaF.length === 0
+                        ? (surf.reason === 'unknown' ? 'No se pudo completar la verificación' : 'Todavía no evaluado')
+                        : view === 'owner'
+                          ? (areaF.length > 0 ? areaF[0].title_plain : a.subtitle)
+                          : (areaF.length > 0 ? areaF[0].description_tech : a.subtitle)
                     const onOpen = isCred
                       ? (['exposed', 'ok', 'unknown'].includes(credCard.status) ? () => setCredOpen(true) : undefined)
                       : (areaF.length > 0 ? () => setFindingModal(areaF) : undefined)
-                    const badgeLabel = { analyzing: 'ANALIZANDO', unknown: 'SIN DATOS', not_included: 'NO INCLUIDO', unavailable: 'N/D', pending: 'PENDIENTE' }[credCard.status]
+                    const badgeLabel = isCred
+                      ? { analyzing: 'ANALIZANDO', unknown: 'SIN DATOS', not_included: 'NO INCLUIDO', unavailable: 'N/D', pending: 'PENDIENTE' }[credCard.status]
+                      : (surf.reason === 'unknown' ? 'SIN DATOS' : 'NO EVALUADO')
 
                     return (
                       <div key={i}
@@ -1535,7 +1541,7 @@ export default function Dashboard() {
                       >
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                           <Icon name={a.icon} size={16} color={isOk ? C.t3 : C.amberText} />
-                          <StatusBadge status={status === 'pending' ? 'neutral' : isOk ? 'ok' : 'review'} label={isCred ? badgeLabel : undefined} />
+                          <StatusBadge status={status === 'pending' ? 'neutral' : isOk ? 'ok' : 'review'} label={badgeLabel} />
                         </div>
                         <div style={{
                           fontFamily: C.title, fontSize: 13, fontWeight: 600,

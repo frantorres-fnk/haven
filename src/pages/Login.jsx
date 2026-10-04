@@ -199,7 +199,6 @@ export default function Login() {
                         <input
                           style={s.input}
                           type="email"
-                          placeholder="vos@tuempresa.com"
                           value={resetEmail}
                           onChange={e => setResetEmail(e.target.value)}
                           required
@@ -251,7 +250,6 @@ export default function Login() {
                   <input
                     style={{ ...s.input, ...(emailFocused ? s.inputFocus : {}) }}
                     type="email"
-                    placeholder="vos@tuempresa.com"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     onFocus={() => setEmailFocused(true)}

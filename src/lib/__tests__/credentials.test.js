@@ -89,7 +89,7 @@ describe('UI: tarjeta y detalle', () => {
   it('Dashboard usa el estado propio de Credenciales (no "sin findings = OK") y abre el detalle', () => {
     const d = src('pages/Dashboard.jsx')
     expect(d).toMatch(/if \(category === 'credentials'\) return credentialAreaStatus\(credCard\)/)
-    expect(d).toMatch(/c\.category === 'credentials' \? credCard\.status === 'ok'/)
+    expect(d).toMatch(/if \(c\.category === 'credentials'\) \{\s*const t = credentialComplianceState\(credCard\)/)
     expect(d).toMatch(/const sub {4}= isCred \? credCard\.text/)
     expect(d).toMatch(/<CredentialsPanel domainId=\{domain\.id\}/)
   })

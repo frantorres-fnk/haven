@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { passwordProblem, PASSWORD_MIN_LENGTH } from '../lib/account'
 import { st } from './authStyles'
+import Wordmark from './Wordmark'
 
 /**
  * Formulario de cambio de contraseña (primer login y Mi cuenta).
@@ -58,11 +59,11 @@ function Field({ label, value, onChange, autoComplete, placeholder }) {
 }
 
 
+// Mismo logo que login y dashboard
 export function Brand() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 32 }}>
-      <div style={{ width: 22, height: 3, background: '#4F7EFF', borderRadius: 2, marginBottom: 6 }} />
-      <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 28, letterSpacing: '.08em', color: '#EDF1F8' }}>HAVEN</div>
+    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
+      <Wordmark size={36} variant="outline" gap={11} />
     </div>
   )
 }

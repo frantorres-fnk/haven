@@ -67,7 +67,7 @@ export default function OnboardingDomain() {
             <p style={st.sub}>Es el dominio de tu empresa que HAVEN va a monitorear. Te vamos a enviar un mail para confirmarlo.</p>
             <form onSubmit={handleSubmit}>
               <label style={st.label}>Dominio</label>
-              <input value={input} onChange={e => { setInput(e.target.value); setError('') }} placeholder="empresa.com.ar"
+              <input value={input} onChange={e => { setInput(e.target.value); setError('') }}
                 autoComplete="off" autoCapitalize="none" spellCheck={false} required style={{ ...st.input, marginBottom: 18 }} />
               {error && <p role="alert" style={st.error}>{error}</p>}
               <button type="submit" disabled={busy} style={{ ...st.btn, opacity: busy ? 0.7 : 1 }}>

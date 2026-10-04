@@ -366,7 +366,7 @@ export default function Domains() {
     const limit = PLAN_LIMITS[org?.plan] || 1
     const supplierCount = domains.filter(d => d.domain_type === 'supplier').length
     if (supplierCount >= limit - 1) {
-      setError(`Tu plan ${org?.plan?.toUpperCase()} permite hasta ${limit} dominio(s) en total. Actualizá tu plan para agregar más.`)
+      setError(`Tu plan ${org?.plan?.toUpperCase()} permite hasta ${limit} ${limit === 1 ? 'dominio' : 'dominios'} en total. Actualizá tu plan para agregar más.`)
       return
     }
     const cleanDomain = form.domain.toLowerCase()

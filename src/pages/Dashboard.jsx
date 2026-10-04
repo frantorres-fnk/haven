@@ -5,7 +5,7 @@ import { resolveMembership } from '../lib/membership'
 import { requestScan } from '../lib/scan'
 import { fetchCompletedScans, fetchOpenFindings, fetchScanHistory, fetchCheckStates } from '../lib/domainStats'
 import { preBaselineState, canRequestManualScan } from '../lib/domains'
-import { fetchCredentialSummary, credentialCardState, credentialAreaStatus } from '../lib/credentials'
+import { fetchCredentialSummary, credentialCardState, credentialAreaStatus, credentialComplianceState, complianceSummary } from '../lib/credentials'
 import CredentialsPanel from '../components/CredentialsPanel'
 import ResendVerificationButton from '../components/ResendVerificationButton'
 import Wordmark from '../components/Wordmark'
@@ -970,10 +970,19 @@ export default function Dashboard() {
   const framework    = FRAMEWORKS[org?.industry] || FRAMEWORKS.general
   // Credenciales: "cubierto" solo con una evaluación PASS real (nunca por ausencia de findings)
   const credCard     = credentialCardState(credSummary)
-  const compControls = framework.controls.map(c => ({ ...c, ok: c.category === 'credentials' ? credCard.status === 'ok' : !findings.some(f => f.category === c.category) }))
-  const compHit      = compControls.filter(c => c.ok).length
-  const compTot      = compControls.length
-  const compPct      = Math.round(compHit / compTot * 100)
+  // Tri-state solo donde existe de verdad (credenciales); el resto sigue binario
+  const compControls = framework.controls.map(c => {
+    if (c.category === 'credentials') {
+      const t = credentialComplianceState(credCard)
+      return { ...c, state: t.state, text: t.text }
+    }
+    const ok = !findings.some(f => f.category === c.category)
+    return { ...c, state: ok ? 'pass' : 'fail', text: ok ? c.plain : c.failPlain }
+  })
+  const compSum      = complianceSummary(compControls)
+  const compHit      = compSum.covered
+  const compTot      = compSum.total
+  const compPct      = compSum.pct
   const dataLaw      = getDataLaw(domain?.domain)
   const score        = scan?.score ?? 0
   const lastVerification = checkStates.reduce((m, st) => (st.last_run_at && (!m || st.last_run_at > m) ? st.last_run_at : m), null)
@@ -1574,7 +1583,8 @@ export default function Dashboard() {
                           <b style={{ color: C.accent }}>{compHit}</b> de {compTot} controles cubiertos
                         </span>
                         <span style={{ fontFamily: C.mono, fontSize: 11, color: C.t3 }}>
-                          {compTot - compHit} pendiente{compTot - compHit !== 1 ? 's' : ''}
+                          {compSum.failing} pendiente{compSum.failing !== 1 ? 's' : ''}
+                          {compSum.unevaluated > 0 && ` · ${compSum.unevaluated} sin evaluar`}
                         </span>
                       </div>
                       <div style={{
@@ -1624,16 +1634,18 @@ export default function Dashboard() {
                         <div style={{
                           width: 24, height: 24, borderRadius: 7, flexShrink: 0,
                           display: 'grid', placeItems: 'center', marginTop: 1,
-                          ...(c.ok
+                          ...(c.state === 'pass'
                             ? { background: 'rgba(61,220,132,.12)', color: C.greenText }
-                            : { background: 'rgba(242,99,126,.12)', color: C.red }),
+                            : c.state === 'fail'
+                              ? { background: 'rgba(242,99,126,.12)', color: C.red }
+                              : { background: 'rgba(147,161,188,.1)', color: C.t3 }),   // sin evaluar: neutral
                         }}>
-                          <Icon name={c.ok ? 'check' : 'x-mark'} size={12} color="currentColor" sw={2.5} />
+                          <Icon name={c.state === 'pass' ? 'check' : c.state === 'fail' ? 'x-mark' : 'minus'} size={12} color="currentColor" sw={2.5} />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: C.t1 }}>{c.name}</div>
                           <div style={{ fontSize: 12, color: C.t2, marginTop: 3, lineHeight: 1.5 }}>
-                            {c.ok ? c.plain : c.failPlain}
+                            {c.text}
                           </div>
                         </div>
                         <span style={{

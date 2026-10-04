@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, hasRecentRecovery, clearRecovery } from '../lib/supabase'
 import { getAccountState, accountRoute, PASSWORD_MIN_LENGTH } from '../lib/account'
+import Wordmark from '../components/Wordmark'
 
 // Solo para el link de "¿Olvidaste tu contraseña?" (sesión de recuperación).
 // Con una sesión normal no se ofrece: el cambio voluntario va por Mi cuenta, que
@@ -31,9 +32,8 @@ export default function ResetPassword() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#080C18', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 32 }}>
-        <div style={{ width: 22, height: 3, background: '#4F7EFF', borderRadius: 2, marginBottom: 6 }} />
-        <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 28, letterSpacing: '.08em', color: '#EDF1F8' }}>HAVEN</div>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
+        <Wordmark size={36} variant="outline" gap={11} />
       </div>
 
       <div style={{ background: '#0C1220', border: '1px solid #1A2240', borderRadius: 16, padding: 40, width: '100%', maxWidth: 420 }}>

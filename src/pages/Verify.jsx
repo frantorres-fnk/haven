@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import Wordmark from '../components/Wordmark'
 
 const SCANNER_URL = import.meta.env.VITE_SCANNER_URL || 'https://scanner.franzthorres.workers.dev'
 
@@ -35,7 +36,7 @@ export default function Verify() {
   return (
     <div style={s.page}>
       <div style={s.logo}>
-        <h1 style={s.logoText}>HAVEN<span style={s.dot}>.</span></h1>
+        <div style={{ display: 'flex', justifyContent: 'center' }}><Wordmark size={36} variant="outline" gap={11} /></div>
         <p style={s.logoSub}>by Fenikso</p>
       </div>
 

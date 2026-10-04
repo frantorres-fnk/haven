@@ -80,3 +80,23 @@ export function formatExposureDate(row) {
   if (row.breach_date_precision === 'month') return `${m}/${y}`
   return `${d}/${m}/${y}`
 }
+
+// Cumplimiento: tri-state real para los controles de credenciales.
+// UNKNOWN o sin evaluación NUNCA es incumplimiento: queda "sin evaluar".
+export function credentialComplianceState(card) {
+  if (card?.status === 'ok') return { state: 'pass', text: 'No detectamos credenciales expuestas.' }
+  if (card?.status === 'exposed') return { state: 'fail', text: 'Detectamos credenciales expuestas asociadas al dominio.' }
+  if (card?.status === 'unknown') return { state: 'unknown', text: 'No pudimos completar la evaluación de credenciales.' }
+  if (card?.status === 'not_included' || card?.status === 'unavailable') return { state: 'none', text: 'Monitoreo de credenciales no incluido.' }
+  return { state: 'none', text: 'Evaluación de credenciales pendiente.' }
+}
+
+// Resumen del bloque de cumplimiento: cubiertos / incumplidos / sin evaluar.
+// El porcentaje es cubiertos sobre el total (sin evaluar no suma como cubierto).
+export function complianceSummary(controls) {
+  const list = Array.isArray(controls) ? controls : []
+  const covered = list.filter(c => c.state === 'pass').length
+  const failing = list.filter(c => c.state === 'fail').length
+  const unevaluated = list.length - covered - failing
+  return { covered, failing, unevaluated, total: list.length, pct: list.length ? Math.round(covered / list.length * 100) : 0 }
+}

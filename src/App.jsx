@@ -23,7 +23,7 @@ function App() {
         <Route path="/verify" element={<Verify />} />
         <Route path="/domains" element={<RequireAccount><Domains /></RequireAccount>} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/admin" element={<RequireAccount><Admin /></RequireAccount>} />
+        <Route path="/admin" element={<Admin />} />
         <Route path="/accept-invite" element={<AcceptInvite />} />
         <Route path="/account" element={<RequireAccount><Account /></RequireAccount>} />
         <Route path="/onboarding/domain" element={<RequireAccount><OnboardingDomain /></RequireAccount>} />

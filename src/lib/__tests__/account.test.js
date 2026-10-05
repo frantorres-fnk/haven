@@ -180,11 +180,13 @@ describe('wiring de rutas y páginas', () => {
   const here = dirname(fileURLToPath(import.meta.url))
   const src = (p) => readFileSync(join(here, '../..', p), 'utf8')
 
-  it('App.jsx protege dashboard/domains/admin/account con RequireAccount; la de cambio obligatorio con allowPasswordChange', () => {
+  it('App.jsx protege dashboard/domains/account con RequireAccount; /admin usa su propio login; la de cambio obligatorio con allowPasswordChange', () => {
     const app = src('App.jsx')
-    for (const path of ['/dashboard', '/domains', '/admin', '/account']) {
+    for (const path of ['/dashboard', '/domains', '/account']) {
       expect(app).toMatch(new RegExp(`path="${path}" element={<RequireAccount>`))
     }
+    // /admin: login propio + autorización server-side (/admin/data → verifyAdmin)
+    expect(app).toMatch(/path="\/admin" element={<Admin \/>}/)
     expect(app).toMatch(/path="\/account\/password-required" element={<RequireAccount allowPasswordChange>/)
     // el signup self-service sigue público
     expect(app).toMatch(/path="\/onboarding" element={<Onboarding \/>}/)

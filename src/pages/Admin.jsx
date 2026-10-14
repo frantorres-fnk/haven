@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { authErrorMessage } from '../lib/authErrors'
 import Wordmark from '../components/Wordmark'
+import AdminFindingDetail from '../components/AdminFindingDetail'
+import { findingsForDomain, emptyFindingsText } from '../lib/adminFindings'
 
 const SCANNER_URL = import.meta.env.VITE_SCANNER_URL || 'https://scanner.franzthorres.workers.dev'
 
@@ -222,9 +224,8 @@ export default function Admin() {
   const [selectedPlan,    setSelectedPlan]    = useState('advanced')
   const [selectedBilling,    setSelectedBilling]    = useState('stripe')
   const [activateOnBilling, setActivateOnBilling] = useState(false)
-  const [testReport,      setTestReport]      = useState({})
-  const [testPhishing,    setTestPhishing]    = useState({})
   const [jiraTicket,      setJiraTicket]      = useState({})
+  const [detailFindingId, setDetailFindingId] = useState(null)
 
   const [authEmail,    setAuthEmail]    = useState('')
   const [authPassword, setAuthPassword] = useState('')
@@ -296,7 +297,7 @@ export default function Admin() {
         : null
       const domainsWithData = orgDomains.map(d => {
         const domainScan     = data.scans.find(s => s.domain_id === d.id) || null
-        const domainFindings = (data.findings || []).filter(f => f.domain_id === d.id)
+        const domainFindings = findingsForDomain(data, d.id)
         return { ...d, lastScan: domainScan, findings: domainFindings }
       })
       return { ...org, domains: domainsWithData, primaryDomain, lastScore: lastScan?.score || null }
@@ -347,54 +348,8 @@ export default function Admin() {
     navigate('/login')
   }
 
-  async function handleTestMonthlyReport(orgId) {
-    setTestReport(prev => ({ ...prev, [orgId]: { loading: true, ok: null, message: '' } }))
-    try {
-      const token = await getAuthToken()
-      const now    = new Date()
-      const pStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(),     1))
-      const pEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
-      const period_start = pStart.toISOString().slice(0, 10)
-      const period_end   = pEnd.toISOString().slice(0, 10)
-
-      const res  = await fetch(`${SCANNER_URL}/admin/test-monthly-report`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ org_id: orgId, period_start, period_end, force: true }),
-      })
-      const data = await res.json()
-      if (data.ok) {
-        const msg = data.skipped
-          ? `Sin datos para ${period_start}`
-          : `OK · ${data.alerts_count ?? '?'} alertas · a: ${data.test_recipient}`
-        setTestReport(prev => ({ ...prev, [orgId]: { loading: false, ok: true, message: msg } }))
-      } else {
-        setTestReport(prev => ({ ...prev, [orgId]: { loading: false, ok: false, message: data.error || 'Error desconocido' } }))
-      }
-    } catch (e) {
-      setTestReport(prev => ({ ...prev, [orgId]: { loading: false, ok: false, message: 'Red: ' + e.message } }))
-    }
-  }
-
-  async function handleTestPhishing(domainId) {
-    setTestPhishing(prev => ({ ...prev, [domainId]: { loading: true, data: null, error: '' } }))
-    try {
-      const token = await getAuthToken()
-      const res = await fetch(`${SCANNER_URL}/admin/test-phishing-search`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain_id: domainId, dry_run: true }),
-      })
-      const data = await res.json()
-      if (data.ok) {
-        setTestPhishing(prev => ({ ...prev, [domainId]: { loading: false, data, error: '' } }))
-      } else {
-        setTestPhishing(prev => ({ ...prev, [domainId]: { loading: false, data: null, error: data.error || 'Error desconocido' } }))
-      }
-    } catch (e) {
-      setTestPhishing(prev => ({ ...prev, [domainId]: { loading: false, data: null, error: 'Red: ' + e.message } }))
-    }
-  }
+  // Callback estable: el modal lo usa como dependencia del listener de Escape
+  const closeFindingDetail = useCallback(() => setDetailFindingId(null), [])
 
   // ── Crear ticket en Jira para un finding ────────────────────────────────────
   async function handleCreateJiraTicket(finding) {
@@ -418,7 +373,7 @@ export default function Admin() {
           ...org,
           domains: org.domains.map(d => ({
             ...d,
-            findings: d.findings.map(f =>
+            findings: d.findings?.map(f =>
               f.id === id ? { ...f, jira_key: data.jira_key } : f
             ),
           })),
@@ -983,34 +938,6 @@ export default function Admin() {
                             {btnSm('Facturación', () => { setModalError(''); setSelectedBilling(org.billing_type || 'stripe'); setActivateOnBilling(false); setModal({ type: 'billing-type', org }) })}
                             {btnSm('Dar de baja', () => { setModalInput(''); setModalError(''); setModal({ type: 'cancel', org }) }, true)}
                           </div>
-                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                            <button
-                              onClick={() => handleTestMonthlyReport(org.id)}
-                              disabled={!!testReport[org.id]?.loading}
-                              style={{
-                                fontFamily: C.mono, fontSize: 10, fontWeight: 600,
-                                letterSpacing: '.05em', whiteSpace: 'nowrap',
-                                color: '#c4b5fd',
-                                background: 'rgba(196,181,253,.07)',
-                                border: '1px solid rgba(196,181,253,.2)',
-                                padding: '4px 10px', borderRadius: 7,
-                                cursor: testReport[org.id]?.loading ? 'not-allowed' : 'pointer',
-                                opacity: testReport[org.id]?.loading ? .6 : 1,
-                              }}
-                            >
-                              {testReport[org.id]?.loading ? '⏳ Enviando...' : '🧪 Test reporte'}
-                              {!testReport[org.id]?.loading && <span style={{ fontSize: 9, opacity: .55, marginLeft: 5, fontWeight: 400, letterSpacing: 0 }}>solo a mí</span>}
-                            </button>
-                          </div>
-                          {testReport[org.id] && !testReport[org.id].loading && (
-                            <div style={{
-                              maxWidth: 220, fontSize: 11, fontFamily: C.mono,
-                              textAlign: 'right', lineHeight: 1.4,
-                              color: testReport[org.id].ok ? C.greenText : C.red,
-                            }}>
-                              {testReport[org.id].message}
-                            </div>
-                          )}
                         </div>
                       )
                     })()}
@@ -1020,10 +947,7 @@ export default function Admin() {
                       <div style={{ borderTop: `1px solid ${C.border}`, padding: '0 24px 20px' }}>
                         {org.domains.map((d, di) => {
                           const dCol = scoreColorAdmin(d.lastScan?.score)
-                          const SORDER = { critical: 0, high: 1, medium: 2, low: 3 }
-                          const sortedFindings = (d.findings || []).slice().sort(
-                            (a, b) => (SORDER[a.severity] ?? 9) - (SORDER[b.severity] ?? 9)
-                          )
+                          const sortedFindings = d.findings || []
                           return (
                             <div key={d.id} style={{
                               paddingTop: 16, paddingBottom: 16,
@@ -1056,101 +980,17 @@ export default function Admin() {
                                 {!d.lastScan && (
                                   <span style={{ fontFamily: C.mono, fontSize: 11, color: C.t3 }}>Sin scan</span>
                                 )}
-                                <button
-                                  onClick={() => handleTestPhishing(d.id)}
-                                  disabled={!!testPhishing[d.id]?.loading}
-                                  style={{
-                                    marginLeft: 'auto', flexShrink: 0,
-                                    fontFamily: C.mono, fontSize: 10, fontWeight: 600,
-                                    letterSpacing: '.04em', whiteSpace: 'nowrap',
-                                    color: '#fcd34d',
-                                    background: 'rgba(252,211,77,.07)',
-                                    border: '1px solid rgba(252,211,77,.2)',
-                                    padding: '3px 9px', borderRadius: 6,
-                                    cursor: testPhishing[d.id]?.loading ? 'not-allowed' : 'pointer',
-                                    opacity: testPhishing[d.id]?.loading ? .55 : 1,
-                                  }}
-                                >
-                                  {testPhishing[d.id]?.loading ? '⏳ Buscando...' : '🎯 Test phishing'}
-                                </button>
+                                {Array.isArray(d.findings) && d.findings.length > 0 && (
+                                  <span style={{ fontFamily: C.mono, fontSize: 11, color: C.t2 }}>
+                                    · {d.findings.length} {d.findings.length === 1 ? 'abierto' : 'abiertos'}
+                                  </span>
+                                )}
                               </div>
-
-                              {/* Resultado test phishing */}
-                              {testPhishing[d.id] && !testPhishing[d.id].loading && (
-                                <div style={{
-                                  marginBottom: 12,
-                                  background: 'rgba(252,211,77,.04)',
-                                  border: '1px solid rgba(252,211,77,.15)',
-                                  borderRadius: 8, padding: '10px 14px',
-                                }}>
-                                  {testPhishing[d.id].error ? (
-                                    <p style={{ margin: 0, fontFamily: C.mono, fontSize: 11, color: C.red }}>
-                                      ✗ {testPhishing[d.id].error}
-                                    </p>
-                                  ) : (() => {
-                                    const r = testPhishing[d.id].data
-                                    return (
-                                      <>
-                                        {/* Query */}
-                                        <div style={{ marginBottom: 8 }}>
-                                          <span style={{ fontFamily: C.mono, fontSize: 9, color: C.t3, textTransform: 'uppercase', letterSpacing: '.08em' }}>Query</span>
-                                          <div style={{
-                                            fontFamily: C.mono, fontSize: 10, color: '#fcd34d',
-                                            marginTop: 3, wordBreak: 'break-all', lineHeight: 1.5,
-                                            background: 'rgba(0,0,0,.25)', borderRadius: 5, padding: '5px 8px',
-                                          }}>
-                                            {r.query}
-                                          </div>
-                                        </div>
-                                        {/* Contadores */}
-                                        <div style={{ display: 'flex', gap: 16, marginBottom: r.filtered_results_count > 0 ? 8 : 0 }}>
-                                          <span style={{ fontFamily: C.mono, fontSize: 11, color: C.t2 }}>
-                                            Crudos: <b style={{ color: C.t1 }}>{r.raw_results_count}</b>
-                                          </span>
-                                          <span style={{ fontFamily: C.mono, fontSize: 11 }}>
-                                            Filtrados:{' '}
-                                            <b style={{ color: r.filtered_results_count > 0 ? C.red : C.greenText }}>
-                                              {r.filtered_results_count}
-                                            </b>
-                                          </span>
-                                          <span style={{ fontFamily: C.mono, fontSize: 11, color: r.would_create_finding ? C.red : C.greenText }}>
-                                            {r.would_create_finding ? '⚠ Crearía finding' : '✓ Limpio'}
-                                          </span>
-                                        </div>
-                                        {/* Resultados filtrados */}
-                                        {r.filtered_results_count > 0 && (
-                                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                            {r.filtered_results.map((fr, fri) => (
-                                              <div key={fri} style={{
-                                                background: 'rgba(242,99,126,.07)',
-                                                border: '1px solid rgba(242,99,126,.18)',
-                                                borderRadius: 6, padding: '6px 10px',
-                                              }}>
-                                                <a
-                                                  href={fr.url} target="_blank" rel="noopener noreferrer"
-                                                  style={{ fontFamily: C.mono, fontSize: 10, color: C.link, wordBreak: 'break-all', display: 'block', marginBottom: fr.title ? 2 : 0 }}
-                                                >
-                                                  {fr.url}
-                                                </a>
-                                                {fr.title && (
-                                                  <div style={{ fontFamily: C.body, fontSize: 11, color: C.t2, lineHeight: 1.4 }}>
-                                                    {fr.title}
-                                                  </div>
-                                                )}
-                                              </div>
-                                            ))}
-                                          </div>
-                                        )}
-                                      </>
-                                    )
-                                  })()}
-                                </div>
-                              )}
 
                               {/* Hallazgos */}
                               {sortedFindings.length === 0 ? (
-                                <p style={{ fontFamily: C.body, fontSize: 12, color: C.t3, margin: 0 }}>
-                                  {d.lastScan ? 'Sin hallazgos abiertos en el último scan' : 'Sin datos de scan disponibles'}
+                                <p style={{ fontFamily: C.body, fontSize: 12, color: d.findings === null ? C.red : C.t3, margin: 0 }}>
+                                  {emptyFindingsText(d.findings, !!d.lastScan)}
                                 </p>
                               ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -1165,7 +1005,7 @@ export default function Admin() {
                                       : null
                                     return (
                                       <div key={fi} style={{
-                                        display: 'grid', gridTemplateColumns: '76px 110px 1fr auto',
+                                        display: 'grid', gridTemplateColumns: '76px 110px minmax(0, 1fr) auto',
                                         gap: 10, alignItems: 'start',
                                         background: 'rgba(130,150,220,.03)', border: `1px solid ${C.border}`,
                                         borderRadius: 8, padding: '8px 12px',
@@ -1189,8 +1029,23 @@ export default function Admin() {
                                             {f.action_tech}
                                           </div>
                                         </div>
-                                        {/* ── Columna Jira ── */}
+                                        {/* ── Acciones: detalle (solo lectura) + Jira ── */}
                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, paddingTop: 1 }}>
+                                          <button
+                                            onClick={() => setDetailFindingId(f.id)}
+                                            disabled={!f.id}
+                                            style={{
+                                              fontFamily: C.mono, fontSize: 9, fontWeight: 600,
+                                              letterSpacing: '.04em', whiteSpace: 'nowrap',
+                                              color: C.link,
+                                              background: 'rgba(91,110,245,.08)',
+                                              border: '1px solid rgba(91,110,245,.25)',
+                                              padding: '2px 7px', borderRadius: 5, cursor: 'pointer',
+                                              opacity: !f.id ? .4 : 1,
+                                            }}
+                                          >
+                                            Ver detalle
+                                          </button>
                                           {resolvedKey ? (
                                             <a
                                               href={resolvedUrl}
@@ -1684,6 +1539,15 @@ export default function Admin() {
           </div>
         )
       })()}
+
+      {detailFindingId && (
+        <AdminFindingDetail
+          scannerUrl={SCANNER_URL}
+          getToken={getAuthToken}
+          findingId={detailFindingId}
+          onClose={closeFindingDetail}
+        />
+      )}
     </div>
   )
 }

@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 /**
- * Portal /admin: findings abiertos por dominio, "Ver detalle" read-only y
- * limpieza de los botones de test. Worker falso a nivel fetch.
+ * Portal /admin: login sin findings, "Ver hallazgos" con carga bajo demanda por
+ * organización (cache + Actualizar), "Ver detalle" read-only y limpieza de los
+ * botones de test. Worker falso a nivel fetch.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { sortBySeverity, findingsForDomain, emptyFindingsText, fetchFindingDetail } from '../lib/adminFindings'
+import { sortBySeverity, domainFindingsView, emptyFindingsText, fetchFindingDetail, fetchOrgFindings } from '../lib/adminFindings'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
@@ -30,8 +31,9 @@ const { default: App } = await import('../App')
 const f = (id, domain_id, check_id, severity, title) => ({ id, domain_id, check_id, category: check_id, severity, title_plain: title, title_tech: `T ${title}`, action_tech: 'acción', jira_key: null })
 const ADMIN_DATA = {
   ok: true,
-  orgs: [{ id: 'org-openit', name: 'OpenIT', plan: 'elite', status: 'trialing' }],
+  orgs: [{ id: 'org-openit', name: 'OpenIT', plan: 'elite', status: 'trialing' }, { id: 'org-otra', name: 'Otra', plan: 'advanced', status: 'active' }],
   domains: [
+    { id: 'd-otra', org_id: 'org-otra', domain: 'otra.com', is_primary: true },
     { id: 'd-com', org_id: 'org-openit', domain: 'openit.com.ar', is_primary: true },
     { id: 'd-global', org_id: 'org-openit', domain: 'openit.global', is_primary: false },
     { id: 'd-clean', org_id: 'org-openit', domain: 'openit.dev', is_primary: false },
@@ -40,7 +42,8 @@ const ADMIN_DATA = {
     { id: 's1', domain_id: 'd-com', score: 60 }, { id: 's2', domain_id: 'd-global', score: 55 }, { id: 's3', domain_id: 'd-clean', score: 98 },
   ],
   admins: [],
-  findings: [
+}
+const OPENIT_FINDINGS = [
     f('f-low', 'd-com', 'headers', 'low', 'Headers'),
     f('f-cred', 'd-com', 'credential_exposure', 'critical', '32 credenciales expuestas'),
     f('f-med', 'd-com', 'dmarc', 'medium', 'DMARC'),
@@ -49,8 +52,7 @@ const ADMIN_DATA = {
     f('f-typo', 'd-global', 'typosquatting', 'medium', 'Typosquatting'),
     f('f-spf', 'd-global', 'spf', 'low', 'SPF'),
     f('f-tls', 'd-global', 'tls', 'critical', 'TLS'),
-  ],
-}
+]
 
 const CRED_DETAIL = {
   ok: true, read_only: true,
@@ -70,7 +72,7 @@ const CRED_DETAIL = {
   },
 }
 
-let container, root, detailResponse, adminData
+let container, root, detailResponse, adminData, orgFindingsResponse
 const jr = (d, s = 200) => new Response(JSON.stringify(d), { status: s })
 let fetchMock
 
@@ -84,7 +86,7 @@ const text = () => container.textContent
 const buttons = (label) => [...container.querySelectorAll('button')].filter(b => b.textContent.trim() === label)
 const click = async (el) => { await act(async () => { el.click() }); await flush() }
 
-async function openAdminFindings() {
+async function loginAdmin() {
   window.history.pushState({}, '', '/admin')
   container = document.createElement('div')
   document.body.appendChild(container)
@@ -97,16 +99,23 @@ async function openAdminFindings() {
   })
   await act(async () => { container.querySelector('form').requestSubmit() })
   await flush()
-  await click(buttons('▼ Ver hallazgos')[0])
 }
+async function openAdminFindings() {
+  await loginAdmin()
+  await click(buttons('▼ Ver hallazgos')[0])   // OpenIT
+}
+const orgCalls = () => fetchMock.mock.calls.map(([u]) => String(u)).filter(u => /\/admin\/organizations\//.test(u))
 
 beforeEach(() => {
   vi.clearAllMocks()
   adminData = ADMIN_DATA
   detailResponse = () => jr(CRED_DETAIL)
+  orgFindingsResponse = (orgId) => jr({ ok: true, org_id: orgId, findings: orgId === 'org-openit' ? OPENIT_FINDINGS : [] })
   fetchMock = vi.fn(async (url) => {
     const u = String(url)
     if (u.endsWith('/admin/data')) return jr(adminData)
+    const of = u.match(/\/admin\/organizations\/([^/]+)\/findings$/)
+    if (of) return orgFindingsResponse(of[1])
     if (/\/admin\/findings\/[^/]+\/detail$/.test(u)) return detailResponse(u)
     return jr({ error: 'inesperado' }, 500)
   })
@@ -124,16 +133,27 @@ describe('lib/adminFindings', () => {
     expect(sortBySeverity([{ severity: 'low' }, { severity: 'critical' }, { severity: 'medium' }, { severity: 'high' }]).map(x => x.severity))
       .toEqual(['critical', 'high', 'medium', 'low'])
   })
-  it('agrupa por domain_id; findings ilegibles → null', () => {
-    expect(findingsForDomain(ADMIN_DATA, 'd-com')).toHaveLength(4)
-    expect(findingsForDomain(ADMIN_DATA, 'd-global')).toHaveLength(4)
-    expect(findingsForDomain(ADMIN_DATA, 'd-clean')).toEqual([])
-    expect(findingsForDomain({ findings: null, findings_error: 'x' }, 'd-com')).toBeNull()
+  it('domainFindingsView: idle/loading → cargando · error → error · success → lista por dominio', () => {
+    const ok = { status: 'success', findings: OPENIT_FINDINGS }
+    expect(domainFindingsView(undefined, 'd-com')).toEqual({ kind: 'loading', text: 'Cargando hallazgos...' })
+    expect(domainFindingsView({ status: 'loading' }, 'd-com').kind).toBe('loading')
+    expect(domainFindingsView({ status: 'error', error: 'No se pudieron cargar los hallazgos abiertos' }, 'd-com'))
+      .toEqual({ kind: 'error', text: 'No se pudieron cargar los hallazgos abiertos' })
+    expect(domainFindingsView(ok, 'd-com').findings.map(x => x.severity)).toEqual(['critical', 'high', 'medium', 'low'])
+    expect(domainFindingsView(ok, 'd-global').findings).toHaveLength(4)
+    expect(domainFindingsView(ok, 'd-clean')).toEqual({ kind: 'list', findings: [] })
   })
-  it('copy del estado vacío', () => {
-    expect(emptyFindingsText([], true)).toBe('Sin hallazgos abiertos')
-    expect(emptyFindingsText([], false)).toBe('Sin datos de scan disponibles')
-    expect(emptyFindingsText(null, true)).toBe('No se pudieron cargar los hallazgos abiertos')
+  it('copy del estado vacío (solo con lista cargada)', () => {
+    expect(emptyFindingsText(true)).toBe('Sin hallazgos abiertos')
+    expect(emptyFindingsText(false)).toBe('Sin datos de scan disponibles')
+  })
+  it.each([[500], [502], [401], [403], [404]])('fetchOrgFindings %i → error, nunca lista vacía', async (status) => {
+    const r = await fetchOrgFindings('https://w', 't', 'org', async () => jr({ error: 'x' }, status))
+    expect(r).toEqual({ status: 'error', error: 'No se pudieron cargar los hallazgos abiertos' })
+  })
+  it('fetchOrgFindings: respuesta sin Array o error de red → error', async () => {
+    expect((await fetchOrgFindings('https://w', 't', 'org', async () => jr({ ok: true, findings: null }))).status).toBe('error')
+    expect((await fetchOrgFindings('https://w', 't', 'org', async () => { throw new Error('offline') })).status).toBe('error')
   })
   it.each([[401, 'sesión expiró'], [403, 'No tenés permisos'], [404, 'ya no existe'], [500, 'No pudimos cargar'], [502, 'No pudimos cargar']])(
     'fetchFindingDetail %i → mensaje controlado', async (status, msg) => {
@@ -144,6 +164,68 @@ describe('lib/adminFindings', () => {
   it('fetchFindingDetail: error de red → mensaje controlado', async () => {
     const r = await fetchFindingDetail('https://w', 't', 'id', async () => { throw new Error('offline') })
     expect(r).toMatchObject({ ok: false, status: 0 })
+  })
+})
+
+describe('/admin → login y carga bajo demanda', () => {
+  it('login: solo /admin/data; las organizaciones aparecen sin pedir hallazgos', async () => {
+    await loginAdmin()
+    expect(text()).toContain('OpenIT')
+    expect(text()).toContain('Otra')
+    expect(orgCalls()).toHaveLength(0)
+    expect(buttons('Ver detalle')).toHaveLength(0)
+    expect(text()).not.toContain('Sin hallazgos abiertos')
+  })
+
+  it('"Ver hallazgos" hace UNA carga, solo de esa org, con el token del admin', async () => {
+    await openAdminFindings()
+    expect(orgCalls()).toEqual([expect.stringMatching(/\/admin\/organizations\/org-openit\/findings$/)])
+    const call = fetchMock.mock.calls.find(([u]) => /org-openit\/findings$/.test(String(u)))
+    expect(call[1].headers.Authorization).toBe('Bearer tok-admin')
+    expect(call[1].method ?? 'GET').toBe('GET')
+    expect(orgCalls().some(u => u.includes('org-otra'))).toBe(false)
+  })
+
+  it('loading: "Cargando hallazgos..." mientras espera, nunca "Sin hallazgos abiertos"', async () => {
+    let release
+    orgFindingsResponse = () => new Promise(r => { release = () => r(jr({ ok: true, findings: OPENIT_FINDINGS })) })
+    await loginAdmin()
+    await act(async () => { buttons('▼ Ver hallazgos')[0].click() })
+    expect(text()).toContain('Cargando hallazgos...')
+    expect(text()).not.toContain('Sin hallazgos abiertos')
+    expect(buttons('↻ Actualizar')[0].disabled).toBe(true)
+    await act(async () => { release() })
+    await flush()
+    expect(text()).not.toContain('Cargando hallazgos...')
+    expect(text().match(/· 4 abiertos/g)).toHaveLength(2)
+  })
+
+  it('segunda apertura usa la cache local (sin nueva request)', async () => {
+    await openAdminFindings()
+    await click(buttons('▲ Ocultar hallazgos')[0])
+    await click(buttons('▼ Ver hallazgos')[0])
+    expect(orgCalls()).toHaveLength(1)
+    expect(text().match(/· 4 abiertos/g)).toHaveLength(2)
+  })
+
+  it('"Actualizar" vuelve a pedir los hallazgos de esa org', async () => {
+    await openAdminFindings()
+    await click(buttons('↻ Actualizar')[0])
+    expect(orgCalls()).toHaveLength(2)
+    expect(orgCalls().every(u => u.includes('org-openit'))).toBe(true)
+  })
+
+  it('error: "No se pudieron cargar los hallazgos abiertos", nunca lista vacía; reabrir reintenta', async () => {
+    orgFindingsResponse = () => jr({ error: 'x' }, 502)
+    await openAdminFindings()
+    expect(text()).toContain('No se pudieron cargar los hallazgos abiertos')
+    expect(text()).not.toContain('Sin hallazgos abiertos')
+    expect(buttons('Ver detalle')).toHaveLength(0)
+    orgFindingsResponse = () => jr({ ok: true, findings: OPENIT_FINDINGS })
+    await click(buttons('▲ Ocultar hallazgos')[0])
+    await click(buttons('▼ Ver hallazgos')[0])
+    expect(orgCalls()).toHaveLength(2)
+    expect(text().match(/· 4 abiertos/g)).toHaveLength(2)
   })
 })
 
@@ -173,11 +255,15 @@ describe('/admin → Ver hallazgos', () => {
     expect(buttons('+ Jira')).toHaveLength(8)
   })
 
-  it('findings ilegibles → error explícito, nunca "Sin hallazgos abiertos"', async () => {
-    adminData = { ...ADMIN_DATA, findings: null, findings_error: 'No se pudieron cargar los hallazgos abiertos' }
+  it('no regresión Jira: crear ticket actualiza la cache y muestra el link', async () => {
+    const base = fetchMock.getMockImplementation()
+    fetchMock.mockImplementation(async (url, init) => (String(url).endsWith('/admin/jira/create-ticket')
+      ? jr({ ok: true, jira_key: 'KAN-77', jira_url: 'https://fenikso-team.atlassian.net/browse/KAN-77' })
+      : base(url, init)))
     await openAdminFindings()
-    expect(text()).toContain('No se pudieron cargar los hallazgos abiertos')
-    expect(text()).not.toContain('Sin hallazgos abiertos')
+    await click(buttons('+ Jira')[0])
+    expect(text()).toContain('KAN-77')
+    expect(buttons('+ Jira')).toHaveLength(7)
   })
 })
 

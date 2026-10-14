@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { authErrorMessage } from '../lib/authErrors'
 import Wordmark from '../components/Wordmark'
 import AdminFindingDetail from '../components/AdminFindingDetail'
-import { findingsForDomain, emptyFindingsText } from '../lib/adminFindings'
+import { fetchOrgFindings, domainFindingsView, emptyFindingsText } from '../lib/adminFindings'
 
 const SCANNER_URL = import.meta.env.VITE_SCANNER_URL || 'https://scanner.franzthorres.workers.dev'
 
@@ -217,6 +217,8 @@ export default function Admin() {
   const [stats, setStats]             = useState({ total: 0, active: 0, trialing: 0, cancelled: 0, mrr: 0 })
   const [expandedOrgs,    setExpandedOrgs]    = useState({})
   const [findingsPanel,   setFindingsPanel]   = useState({})
+  // Hallazgos por org, cargados bajo demanda: { [orgId]: { status: 'loading'|'success'|'error', findings?, error? } }
+  const [orgFindings,     setOrgFindings]     = useState({})
   const [modal,           setModal]           = useState(null)
   const [modalInput,      setModalInput]      = useState('')
   const [modalLoading,    setModalLoading]    = useState(false)
@@ -296,9 +298,8 @@ export default function Admin() {
         ? data.scans.find(s => s.domain_id === primaryDomain.id)
         : null
       const domainsWithData = orgDomains.map(d => {
-        const domainScan     = data.scans.find(s => s.domain_id === d.id) || null
-        const domainFindings = findingsForDomain(data, d.id)
-        return { ...d, lastScan: domainScan, findings: domainFindings }
+        const domainScan = data.scans.find(s => s.domain_id === d.id) || null
+        return { ...d, lastScan: domainScan }
       })
       return { ...org, domains: domainsWithData, primaryDomain, lastScore: lastScan?.score || null }
     })
@@ -348,6 +349,23 @@ export default function Admin() {
     navigate('/login')
   }
 
+  // ── Hallazgos por organización (lazy) ──────────────────────────────────────
+  async function loadOrgFindings(orgId) {
+    setOrgFindings(prev => ({ ...prev, [orgId]: { status: 'loading' } }))
+    const token = await getAuthToken()
+    const result = await fetchOrgFindings(SCANNER_URL, token, orgId)
+    setOrgFindings(prev => ({ ...prev, [orgId]: result }))
+  }
+
+  // Abre/cierra el panel; la primera apertura (o tras un error) pide los hallazgos.
+  // Reabrir usa la cache de la sesión: refrescar es manual ("Actualizar").
+  function toggleFindingsPanel(orgId) {
+    const opening = !findingsPanel[orgId]
+    setFindingsPanel(p => ({ ...p, [orgId]: opening }))
+    const entry = orgFindings[orgId]
+    if (opening && (!entry || entry.status === 'error')) loadOrgFindings(orgId)
+  }
+
   // Callback estable: el modal lo usa como dependencia del listener de Escape
   const closeFindingDetail = useCallback(() => setDetailFindingId(null), [])
 
@@ -368,16 +386,11 @@ export default function Admin() {
           ...prev,
           [id]: { loading: false, error: '', jira_key: data.jira_key, jira_url: data.jira_url },
         }))
-        // Reflejar jira_key en el estado local de orgs para que el botón cambie a link
-        setOrgs(prev => prev.map(org => ({
-          ...org,
-          domains: org.domains.map(d => ({
-            ...d,
-            findings: d.findings?.map(f =>
-              f.id === id ? { ...f, jira_key: data.jira_key } : f
-            ),
-          })),
-        })))
+        // Reflejar jira_key en la cache de hallazgos para que el botón cambie a link
+        setOrgFindings(prev => Object.fromEntries(Object.entries(prev).map(([orgId, entry]) => [orgId, {
+          ...entry,
+          findings: entry.findings?.map(f => (f.id === id ? { ...f, jira_key: data.jira_key } : f)),
+        }])))
       } else {
         setJiraTicket(prev => ({
           ...prev,
@@ -901,7 +914,7 @@ export default function Admin() {
                       return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
                           <button
-                            onClick={() => setFindingsPanel(p => ({ ...p, [org.id]: !p[org.id] }))}
+                            onClick={() => toggleFindingsPanel(org.id)}
                             style={{
                               fontFamily: C.title, fontWeight: 600, fontSize: 13,
                               color: '#fff', background: C.accentBtn,
@@ -945,9 +958,25 @@ export default function Admin() {
 
                     {findingsPanel[org.id] && (
                       <div style={{ borderTop: `1px solid ${C.border}`, padding: '0 24px 20px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 12 }}>
+                          <button
+                            onClick={() => loadOrgFindings(org.id)}
+                            disabled={orgFindings[org.id]?.status === 'loading'}
+                            style={{
+                              fontFamily: C.mono, fontSize: 10, fontWeight: 600, letterSpacing: '.04em',
+                              color: C.t2, background: 'rgba(130,150,220,.06)', border: `1px solid ${C.border}`,
+                              padding: '3px 9px', borderRadius: 6,
+                              cursor: orgFindings[org.id]?.status === 'loading' ? 'not-allowed' : 'pointer',
+                              opacity: orgFindings[org.id]?.status === 'loading' ? .5 : 1,
+                            }}
+                          >
+                            ↻ Actualizar
+                          </button>
+                        </div>
                         {org.domains.map((d, di) => {
                           const dCol = scoreColorAdmin(d.lastScan?.score)
-                          const sortedFindings = d.findings || []
+                          const view = domainFindingsView(orgFindings[org.id], d.id)
+                          const sortedFindings = view.kind === 'list' ? view.findings : []
                           return (
                             <div key={d.id} style={{
                               paddingTop: 16, paddingBottom: 16,
@@ -980,17 +1009,17 @@ export default function Admin() {
                                 {!d.lastScan && (
                                   <span style={{ fontFamily: C.mono, fontSize: 11, color: C.t3 }}>Sin scan</span>
                                 )}
-                                {Array.isArray(d.findings) && d.findings.length > 0 && (
+                                {sortedFindings.length > 0 && (
                                   <span style={{ fontFamily: C.mono, fontSize: 11, color: C.t2 }}>
-                                    · {d.findings.length} {d.findings.length === 1 ? 'abierto' : 'abiertos'}
+                                    · {sortedFindings.length} {sortedFindings.length === 1 ? 'abierto' : 'abiertos'}
                                   </span>
                                 )}
                               </div>
 
                               {/* Hallazgos */}
-                              {sortedFindings.length === 0 ? (
-                                <p style={{ fontFamily: C.body, fontSize: 12, color: d.findings === null ? C.red : C.t3, margin: 0 }}>
-                                  {emptyFindingsText(d.findings, !!d.lastScan)}
+                              {view.kind !== 'list' || sortedFindings.length === 0 ? (
+                                <p style={{ fontFamily: C.body, fontSize: 12, color: view.kind === 'error' ? C.red : C.t3, margin: 0 }}>
+                                  {view.kind === 'list' ? emptyFindingsText(!!d.lastScan) : view.text}
                                 </p>
                               ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>

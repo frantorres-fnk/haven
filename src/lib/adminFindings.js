@@ -9,16 +9,38 @@ export function sortBySeverity(findings) {
     .sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9))
 }
 
-// Findings abiertos de un dominio. null = no se pudieron leer (findings_error):
-// el portal no debe afirmar "sin hallazgos" en ese caso.
-export function findingsForDomain(data, domainId) {
-  if (!Array.isArray(data?.findings)) return null
-  return sortBySeverity(data.findings.filter(f => f.domain_id === domainId))
+export const FINDINGS_ERROR_TEXT = 'No se pudieron cargar los hallazgos abiertos'
+
+/**
+ * GET /admin/organizations/:orgId/findings (lazy load de "Ver hallazgos").
+ * → { status: 'success', findings } | { status: 'error', error }
+ * Un error NUNCA se convierte en lista vacía.
+ */
+export async function fetchOrgFindings(scannerUrl, token, orgId, fetchImpl = fetch) {
+  try {
+    const res = await fetchImpl(`${scannerUrl}/admin/organizations/${encodeURIComponent(orgId)}/findings`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const data = await res.json().catch(() => null)
+    if (res.ok && data?.ok && Array.isArray(data.findings)) return { status: 'success', findings: sortBySeverity(data.findings) }
+    return { status: 'error', error: FINDINGS_ERROR_TEXT }
+  } catch {
+    return { status: 'error', error: FINDINGS_ERROR_TEXT }
+  }
 }
 
-// Texto del estado vacío / error de la lista de hallazgos de un dominio
-export function emptyFindingsText(findings, hasScan) {
-  if (findings === null) return 'No se pudieron cargar los hallazgos abiertos'
+/**
+ * Vista de los hallazgos de un dominio según el estado de carga de su org
+ * (undefined = idle). Solo 'list' puede mostrar "Sin hallazgos abiertos".
+ */
+export function domainFindingsView(orgEntry, domainId) {
+  if (!orgEntry || orgEntry.status === 'loading') return { kind: 'loading', text: 'Cargando hallazgos...' }
+  if (orgEntry.status === 'error') return { kind: 'error', text: orgEntry.error || FINDINGS_ERROR_TEXT }
+  return { kind: 'list', findings: sortBySeverity((orgEntry.findings || []).filter(f => f.domain_id === domainId)) }
+}
+
+// Texto del estado vacío de una lista ya cargada
+export function emptyFindingsText(hasScan) {
   return hasScan ? 'Sin hallazgos abiertos' : 'Sin datos de scan disponibles'
 }
 

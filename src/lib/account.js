@@ -72,6 +72,35 @@ export async function getAccountState(client = supabase) {
   return { status: 'ok', user, orgId: m.orgId, role: m.role, orgStatus, primaryDomain }
 }
 
+/**
+ * Estado de la org propia vía Worker (GET /account/org-status), para el mensaje de
+ * "Acceso finalizado" cuando RLS ya no deja leer la fila de la org. null si no se
+ * pudo determinar (el portal muestra el texto genérico).
+ */
+export async function fetchOwnOrgStatus({ client = supabase, fetchImpl = fetch } = {}) {
+  try {
+    const { data } = await client.auth.getSession()
+    const token = data?.session?.access_token
+    if (!token) return null
+    const res = await fetchImpl(`${SCANNER_URL}/account/org-status`, { headers: { Authorization: `Bearer ${token}` } })
+    const body = await res.json().catch(() => null)
+    return res.ok && body?.ok ? (body.org_status ?? null) : null
+  } catch {
+    return null
+  }
+}
+
+// Texto de "Acceso finalizado" según el motivo
+export function accessEndedCopy(orgStatus) {
+  if (orgStatus === 'trial_ended') {
+    return {
+      text: 'El período de prueba de esta organización finalizó. Si querés continuar utilizando HAVEN, contactá a FENIKSO.',
+      cta: { label: 'Quiero continuar con HAVEN', href: `mailto:hola@fenikso.io?subject=${encodeURIComponent('Quiero continuar con HAVEN')}` },
+    }
+  }
+  return { text: 'El acceso de esta organización a HAVEN ya no está activo. Si necesitás reactivarlo, contactá a FENIKSO.', cta: null }
+}
+
 // A dónde va el usuario después del login / del cambio de contraseña
 export function accountRoute(state) {
   if (!state || state.status === 'no_session') return '/login'

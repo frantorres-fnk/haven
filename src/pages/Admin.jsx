@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import { authErrorMessage } from '../lib/authErrors'
 import Wordmark from '../components/Wordmark'
 import AdminFindingDetail from '../components/AdminFindingDetail'
+import EndTrialModal from '../components/EndTrialModal'
+import { orgLifecycleActions, trialReportBadge, resendTrialReport } from '../lib/trialClosure'
 import { fetchOrgFindings, domainFindingsView, emptyFindingsText } from '../lib/adminFindings'
 
 const SCANNER_URL = import.meta.env.VITE_SCANNER_URL || 'https://scanner.franzthorres.workers.dev'
@@ -176,6 +178,7 @@ function OrgStatusBadge({ status }) {
     active:    { label: 'Activo',    color: C.greenText, bg: 'rgba(61,220,132,.1)',  border: 'rgba(61,220,132,.25)' },
     cancelled: { label: 'Cancelado', color: C.red,       bg: 'rgba(242,99,126,.1)',  border: 'rgba(242,99,126,.25)' },
     past_due:  { label: 'Vencido',   color: C.red,       bg: 'rgba(242,99,126,.1)',  border: 'rgba(242,99,126,.25)' },
+    trial_ended: { label: 'Prueba finalizada', color: C.t2, bg: 'rgba(130,150,220,.08)', border: 'rgba(130,150,220,.25)' },
   }
   const m = map[status] || { label: status || '—', color: C.t2, bg: C.card, border: C.border }
   return (
@@ -214,7 +217,7 @@ export default function Admin() {
   const [newAdmin, setNewAdmin]       = useState({ email: '', name: '' })
   const [addingAdmin, setAddingAdmin] = useState(false)
   const [error, setError]             = useState('')
-  const [stats, setStats]             = useState({ total: 0, active: 0, trialing: 0, cancelled: 0, mrr: 0 })
+  const [stats, setStats]             = useState({ total: 0, active: 0, trialing: 0, trialEnded: 0, cancelled: 0, mrr: 0 })
   const [expandedOrgs,    setExpandedOrgs]    = useState({})
   const [findingsPanel,   setFindingsPanel]   = useState({})
   // Hallazgos por org, cargados bajo demanda: { [orgId]: { status: 'loading'|'success'|'error', findings?, error? } }
@@ -228,6 +231,8 @@ export default function Admin() {
   const [activateOnBilling, setActivateOnBilling] = useState(false)
   const [jiraTicket,      setJiraTicket]      = useState({})
   const [detailFindingId, setDetailFindingId] = useState(null)
+  const [endTrialOrg,     setEndTrialOrg]     = useState(null)
+  const [reportResend,    setReportResend]    = useState({})
 
   const [authEmail,    setAuthEmail]    = useState('')
   const [authPassword, setAuthPassword] = useState('')
@@ -301,7 +306,8 @@ export default function Admin() {
         const domainScan = data.scans.find(s => s.domain_id === d.id) || null
         return { ...d, lastScan: domainScan }
       })
-      return { ...org, domains: domainsWithData, primaryDomain, lastScore: lastScan?.score || null }
+      const trialReport = (data.trial_reports || []).find(r => r.org_id === org.id) || null
+      return { ...org, domains: domainsWithData, primaryDomain, lastScore: lastScan?.score || null, trialReport }
     })
 
     setOrgs(orgsWithData)
@@ -311,8 +317,9 @@ export default function Admin() {
     const active    = orgsWithData.filter(o => o.status === 'active')
     const trialing  = orgsWithData.filter(o => o.status === 'trialing')
     const cancelled = orgsWithData.filter(o => o.status === 'cancelled')
+    const trialEnded = orgsWithData.filter(o => o.status === 'trial_ended')
     const mrr       = active.reduce((sum, o) => sum + (planPrices[o.plan] || 0), 0)
-    setStats({ total: orgsWithData.length, active: active.length, trialing: trialing.length, cancelled: cancelled.length, mrr })
+    setStats({ total: orgsWithData.length, active: active.length, trialing: trialing.length, trialEnded: trialEnded.length, cancelled: cancelled.length, mrr })
     return 200
   }
 
@@ -364,6 +371,17 @@ export default function Admin() {
     setFindingsPanel(p => ({ ...p, [orgId]: opening }))
     const entry = orgFindings[orgId]
     if (opening && (!entry || entry.status === 'error')) loadOrgFindings(orgId)
+  }
+
+  // Reenvío del informe final desde el snapshot guardado. Si ya figura enviado,
+  // reenviar es una acción explícita (confirmación + force).
+  async function handleResendReport(report, needsForce) {
+    if (reportResend[report.id]?.loading) return
+    if (needsForce && !confirm(`El informe ya fue enviado a ${report.recipients.join(', ')}. ¿Reenviarlo de todas formas?`)) return
+    setReportResend(prev => ({ ...prev, [report.id]: { loading: true } }))
+    const r = await resendTrialReport(SCANNER_URL, await getAuthToken(), report.id, { force: needsForce })
+    setReportResend(prev => ({ ...prev, [report.id]: { loading: false, ok: r.ok, message: r.ok ? `Reenviado a ${r.data.email.recipients.join(', ')}` : r.error } }))
+    if (r.ok) { try { await loadOrgs() } catch { /* el mensaje ya quedó */ } }
   }
 
   // Callback estable: el modal lo usa como dependencia del listener de Escape
@@ -709,13 +727,14 @@ export default function Admin() {
 
           {/* KPI GRID */}
           <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(5,1fr)',
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
             gap: 12, marginBottom: 32,
           }}>
             {[
               { label: 'TOTAL CLIENTES', value: stats.total,       color: C.t1        },
               { label: 'ACTIVOS',        value: stats.active,      color: C.greenText },
               { label: 'EN TRIAL',       value: stats.trialing,    color: '#aab8ff'   },
+              { label: 'TRIAL FINALIZADO', value: stats.trialEnded, color: C.t2      },
               { label: 'CANCELADOS',     value: stats.cancelled,   color: C.red       },
               { label: 'MRR',            value: `$${stats.mrr}`,   color: C.greenText },
             ].map((kpi, i) => (
@@ -807,10 +826,8 @@ export default function Admin() {
                           {org.name}
                         </span>
                         <PlanBadge plan={org.plan} />
-                        {org.billing_type === 'manual_transfer'
-                          ? <TransferBadge />
-                          : <OrgStatusBadge status={org.status} />
-                        }
+                        <OrgStatusBadge status={org.status} />
+                        {org.billing_type === 'manual_transfer' && <TransferBadge />}
                       </div>
 
                       <div>
@@ -949,8 +966,26 @@ export default function Admin() {
                           </div>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                             {btnSm('Facturación', () => { setModalError(''); setSelectedBilling(org.billing_type || 'stripe'); setActivateOnBilling(false); setModal({ type: 'billing-type', org }) })}
-                            {btnSm('Dar de baja', () => { setModalInput(''); setModalError(''); setModal({ type: 'cancel', org }) }, true)}
+                            {orgLifecycleActions(org.status).endTrial && btnSm('Finalizar prueba', () => setEndTrialOrg(org), true)}
+                            {orgLifecycleActions(org.status).cancel && btnSm('Dar de baja', () => { setModalInput(''); setModalError(''); setModal({ type: 'cancel', org }) }, true)}
                           </div>
+                          {org.trialReport && (() => {
+                            const b = trialReportBadge(org.trialReport)
+                            const rs = reportResend[org.trialReport.id] || {}
+                            const color = b.tone === 'ok' ? C.greenText : b.tone === 'warn' ? C.amberText : C.t2
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, maxWidth: 260 }}>
+                                <span style={{ fontFamily: C.mono, fontSize: 10, color, textAlign: 'right' }}>
+                                  {b.tone === 'warn' ? '⚠ ' : ''}{b.text}
+                                </span>
+                                {org.trialReport.last_delivery_error && b.tone === 'warn' && (
+                                  <span style={{ fontFamily: C.mono, fontSize: 9, color: C.t3, textAlign: 'right', wordBreak: 'break-word' }}>{org.trialReport.last_delivery_error}</span>
+                                )}
+                                {b.canResend && btnSm(rs.loading ? 'Reenviando…' : b.needsForce ? 'Reenviar informe' : '↻ Reenviar informe', () => handleResendReport(org.trialReport, b.needsForce), !b.needsForce)}
+                                {rs.message && <span style={{ fontFamily: C.mono, fontSize: 10, color: rs.ok ? C.greenText : C.red, textAlign: 'right' }}>{rs.message}</span>}
+                              </div>
+                            )
+                          })()}
                         </div>
                       )
                     })()}
@@ -1568,6 +1603,16 @@ export default function Admin() {
           </div>
         )
       })()}
+
+      {endTrialOrg && (
+        <EndTrialModal
+          org={endTrialOrg}
+          scannerUrl={SCANNER_URL}
+          getToken={getAuthToken}
+          onClose={() => setEndTrialOrg(null)}
+          onDone={async () => { setEndTrialOrg(null); try { await loadOrgs() } catch { /* recargar a mano */ } }}
+        />
+      )}
 
       {detailFindingId && (
         <AdminFindingDetail

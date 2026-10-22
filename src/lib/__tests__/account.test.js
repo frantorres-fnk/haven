@@ -15,15 +15,21 @@ const FUTURE = new Date(Date.now() + 72 * 3600e3).toISOString()
 const PAST = new Date(Date.now() - 3600e3).toISOString()
 const USER = (app_metadata = {}) => ({ id: 'u1', email: 'damian@openit.com.ar', app_metadata })
 
-// Cliente supabase falso: getUser + org_members + domains
-function fakeClient({ user = USER(), getUserError = null, membership = [{ org_id: 'org-o', role: 'owner' }], domains = [], signIn, refresh } = {}) {
+// Cliente supabase falso: getUser + org_members + organizations + domains
+// orgRows: lo que devuelve RLS para organizations (con RLS por estado, [] si la org está inactiva)
+function fakeClient({ user = USER(), getUserError = null, membership = [{ org_id: 'org-o', role: 'owner' }], domains = [], orgRows = [{ status: 'trialing' }], orgRes, signIn, refresh } = {}) {
   const calls = { from: [], signIn: [], refresh: 0 }
   const chain = (table) => {
     const q = {
       select: () => q, eq: () => q, order: () => q,
-      limit: async () => table === 'org_members'
-        ? { data: membership, error: null, status: 200 }
-        : { data: domains, error: null, status: 200 },
+      limit: async () => {
+        if (table === 'org_members') return { data: membership, error: null, status: 200 }
+        if (table === 'organizations') {
+          if (typeof orgRes === 'function') return orgRes()
+          return orgRes ?? { data: orgRows, error: null, status: 200 }
+        }
+        return { data: domains, error: null, status: 200 }
+      },
     }
     return q
   }
@@ -38,6 +44,65 @@ function fakeClient({ user = USER(), getUserError = null, membership = [{ org_id
   }
 }
 const jsonRes = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+
+describe('getAccountState — estado de la organización', () => {
+  it.each([['active'], ['trialing']])('%s → ok (acceso permitido)', async (status) => {
+    const st = await getAccountState(fakeClient({ orgRows: [{ status }] }))
+    expect(st).toMatchObject({ status: 'ok', orgId: 'org-o', orgStatus: status })
+    expect(guardDecision(st)).toEqual({ render: true })
+  })
+
+  it.each([['cancelled'], ['past_due']])('%s → org_inactive (guard bloquea, sin consultar dominios)', async (status) => {
+    const c = fakeClient({ orgRows: [{ status }] })
+    const st = await getAccountState(c)
+    expect(st).toMatchObject({ status: 'org_inactive', orgId: 'org-o', orgStatus: status })
+    expect(guardDecision(st)).toEqual({ inactive: true })
+    expect(c.calls.from).not.toContain('domains')
+  })
+
+  it('con RLS por estado aplicada la fila de la org no es visible (200 sin filas) → org_inactive', async () => {
+    const st = await getAccountState(fakeClient({ orgRows: [] }))
+    expect(st).toMatchObject({ status: 'org_inactive', orgStatus: null })
+  })
+
+  it('error de red / 5xx al leer la org → error (reintentar), NUNCA org_inactive', async () => {
+    const thrown = await getAccountState(fakeClient({ orgRes: () => { throw new Error('Failed to fetch') } }))
+    expect(thrown.status).toBe('error')
+    const http500 = await getAccountState(fakeClient({ orgRes: { data: null, error: { message: 'upstream' }, status: 503 } }))
+    expect(http500.status).toBe('error')
+    const weird = await getAccountState(fakeClient({ orgRes: { data: null, error: null, status: 200 } }))
+    expect(weird.status).toBe('error')
+    expect(guardDecision(http500)).toEqual({ error: true })
+  })
+
+  it('401 al leer la org → no_session', async () => {
+    const st = await getAccountState(fakeClient({ orgRes: { data: null, error: { message: 'jwt' }, status: 401 } }))
+    expect(st.status).toBe('no_session')
+  })
+
+  it('usuario sin membresía mantiene el comportamiento actual (no consulta organizations)', async () => {
+    const c = fakeClient({ membership: [] })
+    expect((await getAccountState(c)).status).toBe('no_membership')
+    expect(c.calls.from).not.toContain('organizations')
+  })
+
+  it('must_change_password tiene prioridad sobre la org inactiva', async () => {
+    const c = fakeClient({ user: USER({ must_change_password: true, temp_password_expires_at: FUTURE }), orgRows: [{ status: 'cancelled' }] })
+    expect((await getAccountState(c)).status).toBe('must_change')
+    expect(c.calls.from).toEqual([])
+  })
+
+  it('reactivación: cancelled → active vuelve a ok', async () => {
+    expect((await getAccountState(fakeClient({ orgRows: [{ status: 'cancelled' }] }))).status).toBe('org_inactive')
+    expect((await getAccountState(fakeClient({ orgRows: [{ status: 'active' }] }))).status).toBe('ok')
+  })
+
+  it('después del login una org inactiva va a /dashboard, donde el guard muestra "Acceso finalizado"', async () => {
+    const st = await getAccountState(fakeClient({ orgRows: [{ status: 'cancelled' }] }))
+    expect(accountRoute(st)).toBe('/dashboard')
+    expect(guardDecision(st, { allowPasswordChange: true })).toEqual({ redirect: '/dashboard' })
+  })
+})
 
 describe('getAccountState', () => {
   it('login con flag → must_change, sin consultar datos de la org', async () => {

@@ -117,7 +117,9 @@ export default function AcceptInvite() {
         setStep('done')
         setTimeout(() => navigate('/dashboard'), 2500)
       } else {
-        setAuthError(data.error || 'No se pudo aceptar la invitación.')
+        setAuthError(data.error === 'organization_inactive'
+          ? 'El acceso de esta organización a HAVEN ya no está activo. Si necesitás reactivarlo, contactá a FENIKSO.'
+          : (data.error || 'No se pudo aceptar la invitación.'))
         setStep('error')
       }
     } catch {

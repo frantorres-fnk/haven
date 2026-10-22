@@ -19,9 +19,14 @@ export function isTempPasswordExpired(appMetadata, now = Date.now()) {
  *   { status: 'no_session' }
  *   { status: 'error' }                                → red / 5xx: la sesión se conserva
  *   { status: 'must_change' | 'temp_expired', user }   → contraseña temporal pendiente
- *   { status: 'ok', user, orgId, role, primaryDomain } → primaryDomain: fila | null | undefined (no se pudo leer)
+ *   { status: 'ok', user, orgId, role, orgStatus, primaryDomain } → primaryDomain: fila | null | undefined (no se pudo leer)
+ *   { status: 'org_inactive', user, orgId, orgStatus }  → org cancelled / past_due: sin acceso al tenant
  *   { status: 'no_membership', user }
  */
+// Solo estas orgs usan el tenant (igual que el Worker y RLS). El resto queda bloqueado
+// sin borrar nada: al volver a active / trialing el acceso vuelve.
+export const ACTIVE_ORG_STATUSES = ['active', 'trialing']
+
 export async function getAccountState(client = supabase) {
   let res
   try { res = await client.auth.getUser() } catch { return { status: 'error' } }
@@ -40,6 +45,22 @@ export async function getAccountState(client = supabase) {
   if (m.status === 'error') return { status: 'error' }
   if (m.status === 'no_membership') return { status: 'no_membership', user }
 
+  // Estado de la org. Con RLS por estado (20261022120000) la fila de una org
+  // inactiva no es visible: membresía visible + org invisible (200 sin filas) solo
+  // ocurre si la org no está activa. Un error de lectura nunca es "inactiva".
+  let orgRes
+  try {
+    orgRes = await client.from('organizations').select('status').eq('id', m.orgId).limit(1)
+  } catch {
+    return { status: 'error' }
+  }
+  if (orgRes.error) return orgRes.status === 401 ? { status: 'no_session' } : { status: 'error' }
+  if (!Array.isArray(orgRes.data)) return { status: 'error' }
+  const orgStatus = orgRes.data[0] ? (orgRes.data[0].status ?? null) : null
+  if (!orgRes.data[0] || !ACTIVE_ORG_STATUSES.includes(orgStatus)) {
+    return { status: 'org_inactive', user, orgId: m.orgId, orgStatus }
+  }
+
   let primaryDomain
   try {
     const { data: rows, error: domErr } = await client
@@ -48,7 +69,7 @@ export async function getAccountState(client = supabase) {
     if (!domErr && Array.isArray(rows)) primaryDomain = rows[0] ?? null
   } catch { primaryDomain = undefined }
 
-  return { status: 'ok', user, orgId: m.orgId, role: m.role, primaryDomain }
+  return { status: 'ok', user, orgId: m.orgId, role: m.role, orgStatus, primaryDomain }
 }
 
 // A dónde va el usuario después del login / del cambio de contraseña
@@ -66,6 +87,7 @@ export function guardDecision(state, { allowPasswordChange = false } = {}) {
   const pending = state.status === 'must_change' || state.status === 'temp_expired'
   if (pending) return allowPasswordChange ? { render: true } : { redirect: '/account/password-required' }
   if (allowPasswordChange) return { redirect: accountRoute(state) }   // ya no hay nada que cambiar
+  if (state.status === 'org_inactive') return { inactive: true }
   return { render: true }
 }
 

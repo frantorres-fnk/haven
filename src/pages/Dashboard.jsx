@@ -1331,7 +1331,6 @@ export default function Dashboard() {
                     {[
                       ['ÚLTIMA VERIFICACIÓN', timeSince(lastVerification ?? scan.completed_at)],
                       ['HALLAZGOS', `${findings.length} abiertos`],
-                      ['PLAN', org?.plan?.toUpperCase() ?? '—'],
                     ].map(([label, val]) => (
                       <div key={label}>
                         <div style={{ fontFamily: C.mono, fontSize: 9, letterSpacing: '.16em', textTransform: 'uppercase', color: C.t3 }}>{label}</div>

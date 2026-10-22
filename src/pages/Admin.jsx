@@ -5,6 +5,8 @@ import { authErrorMessage } from '../lib/authErrors'
 import Wordmark from '../components/Wordmark'
 import AdminFindingDetail from '../components/AdminFindingDetail'
 import EndTrialModal from '../components/EndTrialModal'
+import CreateClientModal from '../components/CreateClientModal'
+import { resendClientAccess, accessText } from '../lib/adminProvisioning'
 import { orgLifecycleActions, trialReportBadge, resendTrialReport } from '../lib/trialClosure'
 import { fetchOrgFindings, domainFindingsView, emptyFindingsText } from '../lib/adminFindings'
 
@@ -138,25 +140,6 @@ function MiniScoreRing({ score, monitoring }) {
   )
 }
 
-// ─── Plan badge ─────────────────────────────────────────────────────────────────
-function PlanBadge({ plan }) {
-  const styles = {
-    elite:    { color: '#aab8ff', bg: 'rgba(91,110,245,.12)',  border: 'rgba(91,110,245,.28)' },
-    premium:  { color: '#c4b5fd', bg: 'rgba(139,92,246,.12)', border: 'rgba(139,92,246,.28)' },
-    advanced: { color: C.t2,     bg: C.card,                  border: C.border              },
-  }
-  const s = styles[plan?.toLowerCase()] || styles.advanced
-  return (
-    <span style={{
-      fontFamily: C.mono, fontSize: 10, fontWeight: 600, letterSpacing: '.08em',
-      textTransform: 'uppercase', color: s.color, background: s.bg,
-      border: `1px solid ${s.border}`, padding: '2px 8px', borderRadius: 20,
-    }}>
-      {plan || '—'}
-    </span>
-  )
-}
-
 // ─── Billing type badge ─────────────────────────────────────────────────────────
 function TransferBadge() {
   return (
@@ -226,12 +209,14 @@ export default function Admin() {
   const [modalInput,      setModalInput]      = useState('')
   const [modalLoading,    setModalLoading]    = useState(false)
   const [modalError,      setModalError]      = useState('')
-  const [selectedPlan,    setSelectedPlan]    = useState('advanced')
   const [selectedBilling,    setSelectedBilling]    = useState('stripe')
   const [activateOnBilling, setActivateOnBilling] = useState(false)
   const [jiraTicket,      setJiraTicket]      = useState({})
   const [detailFindingId, setDetailFindingId] = useState(null)
   const [endTrialOrg,     setEndTrialOrg]     = useState(null)
+  const [showCreateClient, setShowCreateClient] = useState(false)
+  const [highlightOrg,    setHighlightOrg]    = useState(null)
+  const [accessAction,    setAccessAction]    = useState({})
   const [reportResend,    setReportResend]    = useState({})
 
   const [authEmail,    setAuthEmail]    = useState('')
@@ -371,6 +356,31 @@ export default function Admin() {
     setFindingsPanel(p => ({ ...p, [orgId]: opening }))
     const entry = orgFindings[orgId]
     if (opening && (!entry || entry.status === 'error')) loadOrgFindings(orgId)
+  }
+
+  // Reenvío del acceso del owner (bienvenida + confirmación del dominio). Con
+  // regenerate: nueva temporal SOLO si el owner todavía no definió su contraseña
+  // (lo valida el Worker); se muestra una vez y no se guarda.
+  async function handleResendAccess(org, regenerate) {
+    if (accessAction[org.id]?.loading) return
+    const msg = regenerate
+      ? 'Se generará una nueva contraseña temporal (la anterior deja de servir) y se reenviará el acceso. ¿Continuar?'
+      : `¿Reenviar el email de acceso de ${org.name} a su owner?`
+    if (!confirm(msg)) return
+    setAccessAction(prev => ({ ...prev, [org.id]: { loading: true } }))
+    const r = await resendClientAccess(SCANNER_URL, await getAuthToken(), org.id, { regeneratePassword: regenerate })
+    setAccessAction(prev => ({ ...prev, [org.id]: r.ok
+      ? { loading: false, ok: true, message: `Acceso reenviado a ${r.data.recipient}`, recipient: r.data.recipient, loginUrl: r.data.login_url,
+          tempPassword: r.data.temp_password ?? null, expiresAt: r.data.temp_password_expires_at ?? null, canRegenerate: !regenerate }
+      : { loading: false, ok: false, message: r.error } }))
+  }
+
+  async function viewClient(orgId) {
+    setShowCreateClient(false)
+    setActiveTab('clients')
+    try { await loadOrgs() } catch { /* el listado anterior sigue visible */ }
+    setHighlightOrg(orgId)
+    setTimeout(() => document.getElementById(`org-${orgId}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' }), 50)
   }
 
   // Reenvío del informe final desde el snapshot guardado. Si ya figura enviado,
@@ -759,11 +769,12 @@ export default function Admin() {
             ))}
           </div>
 
-          {/* TABS */}
+          {/* TABS + alta de cliente */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
           <div style={{
             display: 'flex', gap: 4,
             background: C.card, border: `1px solid ${C.border}`,
-            borderRadius: 11, padding: 4, width: 'fit-content', marginBottom: 24,
+            borderRadius: 11, padding: 4, width: 'fit-content',
           }}>
             {[
               { key: 'clients', label: `Clientes (${stats.total})` },
@@ -779,6 +790,14 @@ export default function Admin() {
                 {t.label}
               </button>
             ))}
+          </div>
+          <button onClick={() => setShowCreateClient(true)} style={{
+            fontFamily: C.title, fontWeight: 700, fontSize: 13, color: '#fff', background: C.accentBtn,
+            border: 'none', padding: '10px 18px', borderRadius: 10, cursor: 'pointer', whiteSpace: 'nowrap',
+            boxShadow: '0 2px 10px rgba(91,110,245,.25)',
+          }}>
+            + Crear cliente
+          </button>
           </div>
 
           {/* ── CLIENTES ─────────────────────────────────────────────────────── */}
@@ -799,8 +818,8 @@ export default function Admin() {
                 const tColor     = trialColor(org.trial_ends_at)
 
                 return (
-                  <div key={org.id} style={{
-                    background: C.card, border: `1px solid ${C.border}`,
+                  <div key={org.id} id={`org-${org.id}`} style={{
+                    background: C.card, border: `1px solid ${highlightOrg === org.id ? C.accent : C.border}`,
                     borderRadius: 16, backdropFilter: 'blur(8px)', overflow: 'hidden',
                   }}>
                     <div style={{
@@ -825,7 +844,6 @@ export default function Admin() {
                         }}>
                           {org.name}
                         </span>
-                        <PlanBadge plan={org.plan} />
                         <OrgStatusBadge status={org.status} />
                         {org.billing_type === 'manual_transfer' && <TransferBadge />}
                       </div>
@@ -962,13 +980,23 @@ export default function Admin() {
                               isPaused ? '▶ Reanudar' : '⏸ Pausar',
                               () => { setModalError(''); setModal({ type: isPaused ? 'resume' : 'pause', org }) }
                             )}
-                            {btnSm('Plan', () => { setModalError(''); setSelectedPlan(org.plan || 'advanced'); setModal({ type: 'change-plan', org }) })}
                           </div>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                             {btnSm('Facturación', () => { setModalError(''); setSelectedBilling(org.billing_type || 'stripe'); setActivateOnBilling(false); setModal({ type: 'billing-type', org }) })}
+                            {(org.status === 'trialing' || org.status === 'active') && btnSm(accessAction[org.id]?.loading ? 'Enviando…' : 'Reenviar acceso', () => handleResendAccess(org, false))}
                             {orgLifecycleActions(org.status).endTrial && btnSm('Finalizar prueba', () => setEndTrialOrg(org), true)}
                             {orgLifecycleActions(org.status).cancel && btnSm('Dar de baja', () => { setModalInput(''); setModalError(''); setModal({ type: 'cancel', org }) }, true)}
                           </div>
+                          {accessAction[org.id]?.message && (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, maxWidth: 280 }}>
+                              <span style={{ fontFamily: C.mono, fontSize: 10, color: accessAction[org.id].ok ? C.greenText : C.red, textAlign: 'right' }}>{accessAction[org.id].message}</span>
+                              {accessAction[org.id].tempPassword && (
+                                <span data-testid="regenerated-temp" style={{ fontFamily: C.mono, fontSize: 11, color: C.t1, wordBreak: 'break-all', textAlign: 'right' }}>{accessAction[org.id].tempPassword}</span>
+                              )}
+                              {accessAction[org.id].tempPassword && btnSm('Copiar acceso', () => navigator.clipboard?.writeText(accessText({ loginUrl: accessAction[org.id].loginUrl, email: accessAction[org.id].recipient, tempPassword: accessAction[org.id].tempPassword, expiresAt: accessAction[org.id].expiresAt })).catch(() => {}))}
+                              {accessAction[org.id].canRegenerate && btnSm('Nueva contraseña temporal', () => handleResendAccess(org, true))}
+                            </div>
+                          )}
                           {org.trialReport && (() => {
                             const b = trialReportBadge(org.trialReport)
                             const rs = reportResend[org.trialReport.id] || {}
@@ -1365,7 +1393,6 @@ export default function Admin() {
           'billing-type': 'Tipo de facturación',
           'pause':        '⏸ Pausar monitoreo',
           'resume':       '▶ Reanudar monitoreo',
-          'change-plan':  'Cambiar plan',
           'cancel':       '⚠️ Dar de baja',
         }[modal.type]
 
@@ -1515,46 +1542,6 @@ export default function Admin() {
                 </div>
               </>)}
 
-              {/* ── CHANGE PLAN ── */}
-              {modal.type === 'change-plan' && (<>
-                <div style={{ marginBottom: 8 }}>
-                  {fieldLabel('Nuevo plan')}
-                  {[
-                    { value: 'advanced', label: 'Advanced', desc: '1 dominio — $99/mes' },
-                    { value: 'premium',  label: 'Premium',  desc: '3 dominios — $199/mes' },
-                    { value: 'elite',    label: 'Elite',    desc: '6 dominios — $299/mes' },
-                  ].map(opt => (
-                    <label key={opt.value} style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 10,
-                      padding: '12px 14px', borderRadius: 10, marginBottom: 8, cursor: 'pointer',
-                      background: selectedPlan === opt.value ? 'rgba(91,110,245,.1)' : C.card,
-                      border: `1px solid ${selectedPlan === opt.value ? C.accent : C.border}`,
-                    }}>
-                      <input
-                        type="radio" name="plan" value={opt.value}
-                        checked={selectedPlan === opt.value}
-                        onChange={() => setSelectedPlan(opt.value)}
-                        style={{ marginTop: 2, accentColor: C.accent }}
-                      />
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: C.t1, marginBottom: 2 }}>{opt.label}</div>
-                        <div style={{ fontSize: 12, color: C.t3 }}>{opt.desc}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-                {modal.org.billing_type !== 'manual_transfer' && (
-                  <p style={{ fontSize: 12, color: C.t3, marginBottom: 16, lineHeight: 1.5 }}>
-                    Facturación Stripe activa: se aplicará prorrateo automático al período en curso.
-                  </p>
-                )}
-                {modalError && <div style={{ color: C.red, fontSize: 13, marginBottom: 12 }}>{modalError}</div>}
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                  {cancelBtn}
-                  {confirmBtn('Cambiar plan', () => execAction(modal.org.id, 'change-plan', { new_plan: selectedPlan }))}
-                </div>
-              </>)}
-
               {/* ── CANCEL ── */}
               {modal.type === 'cancel' && (<>
                 <div style={{
@@ -1603,6 +1590,15 @@ export default function Admin() {
           </div>
         )
       })()}
+
+      {showCreateClient && (
+        <CreateClientModal
+          scannerUrl={SCANNER_URL}
+          getToken={getAuthToken}
+          onClose={async () => { setShowCreateClient(false); try { await loadOrgs() } catch { /* recargar a mano */ } }}
+          onViewClient={viewClient}
+        />
+      )}
 
       {endTrialOrg && (
         <EndTrialModal

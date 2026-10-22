@@ -8,6 +8,8 @@ import Wordmark from '../components/Wordmark'
 
 const SCANNER_URL = import.meta.env.VITE_SCANNER_URL || 'https://scanner.franzthorres.workers.dev'
 const PLAN_LIMITS = { advanced: 1, premium: 3, elite: 6 }
+// Mismo criterio que el Worker: el cupo interno por plan, ampliable con domain_limit
+const domainLimit = (org) => Math.max(PLAN_LIMITS[org?.plan] ?? 1, Number(org?.domain_limit) || 0)
 
 // ─── Design tokens (mismos que Dashboard) ───────────────────────────────────
 const C = {
@@ -363,10 +365,10 @@ export default function Domains() {
   async function handleAddDomain(e) {
     e.preventDefault()
     setError('')
-    const limit = PLAN_LIMITS[org?.plan] || 1
+    const limit = domainLimit(org)
     const supplierCount = domains.filter(d => d.domain_type === 'supplier').length
     if (supplierCount >= limit - 1) {
-      setError(`Tu plan ${org?.plan?.toUpperCase()} permite hasta ${limit} ${limit === 1 ? 'dominio' : 'dominios'} en total. Actualizá tu plan para agregar más.`)
+      setError(`Tu entorno HAVEN permite hasta ${limit} ${limit === 1 ? 'dominio' : 'dominios'} en total. Contactá a FENIKSO para ampliarlo.`)
       return
     }
     const cleanDomain = form.domain.toLowerCase()
@@ -427,7 +429,7 @@ export default function Domains() {
     await loadData()
   }
 
-  const limit  = PLAN_LIMITS[org?.plan] || 1
+  const limit  = domainLimit(org)
   const canAdd = domains.length < limit
 
   const inputStyle = (field) => ({
@@ -523,15 +525,7 @@ export default function Domains() {
             <span>/</span>
             <span>{limit}</span>
             <span style={{ color: C.t3 }}>
-              dominio{limit !== 1 ? 's' : ''} · Plan
-            </span>
-            <span style={{
-              fontFamily: C.title, fontWeight: 700, fontSize: 12,
-              color: C.link, background: 'rgba(91,110,245,.1)',
-              border: '1px solid rgba(91,110,245,.22)',
-              padding: '2px 8px', borderRadius: 6,
-            }}>
-              {org?.plan ? org.plan.charAt(0).toUpperCase() + org.plan.slice(1) : '—'}
+              dominio{limit !== 1 ? 's' : ''}
             </span>
           </div>
         </div>
@@ -674,13 +668,10 @@ export default function Domains() {
           }}>
             <Icon name="shield" size={28} color={C.link} />
             <p style={{ fontSize: 15, color: C.t1, marginTop: 14, marginBottom: 6 }}>
-              Alcanzaste el límite de tu plan{' '}
-              <b style={{ color: C.link, fontFamily: C.title }}>
-                {org?.plan ? org.plan.charAt(0).toUpperCase() + org.plan.slice(1) : ''}
-              </b>
+              Alcanzaste el límite de dominios de tu entorno
             </p>
             <p style={{ fontSize: 13, color: C.t2, marginBottom: 20, lineHeight: 1.6 }}>
-              Actualizá a Elite para monitorear hasta 6 dominios, o contactanos para un plan personalizado.
+              Si necesitás monitorear más dominios, contactanos y lo ampliamos.
             </p>
             <a
               href="mailto:hola@fenikso.io"

@@ -71,7 +71,6 @@ export default function EndTrialModal({ org, scannerUrl, getToken, onClose, onDo
             )}
             <Grid>
               <Field label="Organización" value={org.name} />
-              <Field label="Plan" value={snap.org.plan ?? '—'} />
               <Field label="Inicio del trial" value={fmtDay(snap.period.trial_started_at)} />
               <Field label="Cierre" value={p.existing ? fmtDay(snap.period.trial_ended_at) : `${fmtDay(new Date().toISOString())} (al confirmar)`} />
             </Grid>

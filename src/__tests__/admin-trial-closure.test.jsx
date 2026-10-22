@@ -133,12 +133,13 @@ describe('modal "Finalizar período de prueba"', () => {
     await click(buttons('Finalizar prueba')[0])
   }
 
-  it('muestra texto, organización, plan, fechas, dominios y destinatarios reales; checkbox marcado por defecto', async () => {
+  it('muestra texto, organización, fechas, dominios y destinatarios reales (sin plan); checkbox marcado por defecto', async () => {
     await open()
     const d = dialog()
     expect(d.textContent).toContain('Se generará el informe final del período, se enviará al cliente y a FENIKSO, se pausará el monitoreo y el acceso de la organización quedará desactivado.')
     expect(d.textContent).toContain('Todos los datos e históricos se conservarán.')
-    for (const t of ['OpenIT', 'elite', '05/10/2026', 'openit.global, openit.com.ar', '9 hallazgos', '33 credenciales expuestas']) expect(d.textContent).toContain(t)
+    for (const t of ['OpenIT', '05/10/2026', 'openit.global, openit.com.ar', '9 hallazgos', '33 credenciales expuestas']) expect(d.textContent).toContain(t)
+    expect(d.textContent).not.toMatch(/elite|advanced|premium|plan/i)
     expect(d.querySelector('[data-testid="customer-recipients"]').textContent).toBe('damian.ramirez@openit.com.ar')
     expect(d.querySelector('[data-testid="internal-recipients"]').textContent).toBe('haven@fenikso.io')
     expect(d.querySelector('input[type="checkbox"]').checked).toBe(true)

@@ -131,11 +131,8 @@ const INDUSTRIES = [
   { value: 'tech',       label: 'Tecnología / SaaS' },
 ]
 
-const PLANS = [
-  { key: 'advanced', label: 'Advanced', price: '$99',  period: '/mes' },
-  { key: 'premium',  label: 'Premium',  price: '$199', period: '/mes' },
-  { key: 'elite',    label: 'Elite',    price: '$299', period: '/mes' },
-]
+// Producto único: toda org nueva es 'elite' internamente (no se muestra)
+const PRODUCT_PLAN = 'elite'
 
 export default function Onboarding() {
   const [step,    setStep]    = useState(1)
@@ -143,7 +140,7 @@ export default function Onboarding() {
   const [error,   setError]   = useState('')
   const [form,    setForm]    = useState({
     company: '', domain: '', industry: 'general',
-    email: '', password: '', plan: 'advanced',
+    email: '', password: '',
   })
 
   // Estados de foco por campo
@@ -199,7 +196,7 @@ export default function Onboarding() {
       name: form.company,
       email: form.email,
       industry: form.industry,
-      plan: form.plan,
+      plan: PRODUCT_PLAN,
       status: 'trialing',
       trial_ends_at: trialEndsAt.toISOString(),
     })
@@ -401,56 +398,7 @@ export default function Onboarding() {
                 </div>
               </div>
 
-              {/* Selección de plan */}
-              <div style={s.fieldGroup}>
-                <label style={s.fieldLabel}>Plan</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-                  {PLANS.map(p => {
-                    const sel = form.plan === p.key
-                    return (
-                      <div
-                        key={p.key}
-                        className={sel ? '' : 'ob-plan'}
-                        onClick={() => update('plan', p.key)}
-                        style={{
-                          border: `1.5px solid ${sel ? '#5b6ef5' : 'rgba(130,150,220,.16)'}`,
-                          borderRadius: 12,
-                          padding: '14px 10px',
-                          cursor: 'pointer',
-                          textAlign: 'center',
-                          background: sel ? 'rgba(91,110,245,.09)' : 'rgba(16,22,35,.5)',
-                          boxShadow: sel ? '0 0 0 1px rgba(91,110,245,.22)' : 'none',
-                          userSelect: 'none',
-                          transition: 'border-color .15s ease, background .15s ease, box-shadow .15s ease',
-                        }}
-                      >
-                        <div style={{
-                          fontSize: '13px', fontWeight: 700,
-                          fontFamily: "'Space Grotesk', sans-serif",
-                          color: sel ? '#8aa0ff' : '#e8ecf5',
-                          marginBottom: 6,
-                          transition: 'color .15s ease',
-                        }}>
-                          {p.label}
-                        </div>
-                        <div style={{
-                          fontSize: '17px', fontWeight: 700,
-                          fontFamily: "'Space Grotesk', sans-serif",
-                          color: sel ? '#aab8ff' : '#9aa6c2',
-                          lineHeight: 1.2,
-                          transition: 'color .15s ease',
-                        }}>
-                          {p.price}
-                        </div>
-                        <div style={{ fontSize: '11px', color: '#7f8aa6', marginTop: 2 }}>
-                          {p.period}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-                <p style={s.helper}>7 días gratis · cancelás cuando querés.</p>
-              </div>
+              <p style={s.helper}>7 días gratis · cancelás cuando querés.</p>
 
               {error && <div style={s.errorBox}>{error}</div>}
 

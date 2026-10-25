@@ -11,13 +11,20 @@ import { sortBySeverity, domainFindingsView, emptyFindingsText, fetchFindingDeta
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
+let sessionToken = null   // la sesión existe recién después de signInWithPassword
 const auth = {
   getUser: vi.fn(async () => ({ data: { user: null }, error: null })),
-  getSession: vi.fn(async () => ({ data: { session: { access_token: 'tok-admin' } }, error: null })),
-  signOut: vi.fn(async () => ({ error: null })),
-  signInWithPassword: vi.fn(async () => ({ data: {}, error: null })),
+  getSession: vi.fn(async () => ({ data: { session: sessionToken ? { access_token: sessionToken } : null }, error: null })),
+  signOut: vi.fn(async () => { sessionToken = null; return { error: null } }),
+  signInWithPassword: vi.fn(async () => { sessionToken = 'tok-admin'; return { data: {}, error: null } }),
   onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe() {} } } })),
+  // Admin con MFA ya completado en esta sesión (el flujo MFA se prueba en admin-mfa.test.jsx)
+  mfa: {
+    getAuthenticatorAssuranceLevel: vi.fn(async () => ({ data: { currentLevel: 'aal2', nextLevel: 'aal2' }, error: null })),
+    listFactors: vi.fn(async () => ({ data: { all: [], totp: [] }, error: null })),
+  },
 }
+
 vi.mock('../lib/supabase', () => {
   const chain = () => new Proxy(() => {}, {
     get: (_, k) => (k === 'then' ? (res) => res({ data: null, error: null }) : chain()),
@@ -108,6 +115,7 @@ const orgCalls = () => fetchMock.mock.calls.map(([u]) => String(u)).filter(u => 
 
 beforeEach(() => {
   vi.clearAllMocks()
+  sessionToken = null
   adminData = ADMIN_DATA
   detailResponse = () => jr(CRED_DETAIL)
   orgFindingsResponse = (orgId) => jr({ ok: true, org_id: orgId, findings: orgId === 'org-openit' ? OPENIT_FINDINGS : [] })

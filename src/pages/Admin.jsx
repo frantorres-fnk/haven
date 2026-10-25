@@ -5,6 +5,8 @@ import { authErrorMessage } from '../lib/authErrors'
 import Wordmark from '../components/Wordmark'
 import AdminFindingDetail from '../components/AdminFindingDetail'
 import EndTrialModal from '../components/EndTrialModal'
+import AdminMfa from '../components/AdminMfa'
+import { getAdminMfaState, isAal2 } from '../lib/adminMfa'
 import CreateClientModal from '../components/CreateClientModal'
 import { resendClientAccess, accessText } from '../lib/adminProvisioning'
 import { orgLifecycleActions, trialReportBadge, resendTrialReport } from '../lib/trialClosure'
@@ -196,6 +198,8 @@ export default function Admin() {
   const [loading, setLoading]         = useState(true)
   const [isAdmin, setIsAdmin]         = useState(false)
   const [checking, setChecking]       = useState(true)
+  // MFA obligatorio: null | { mode: 'enroll' | 'challenge', factors }
+  const [mfa, setMfa]                 = useState(null)
   const [activeTab, setActiveTab]     = useState('clients')
   const [newAdmin, setNewAdmin]       = useState({ email: '', name: '' })
   const [addingAdmin, setAddingAdmin] = useState(false)
@@ -230,11 +234,57 @@ export default function Admin() {
 
   const navigate = useNavigate()
 
+  // Guard del portal: con sesión, se vuelve a decidir todo (admin + aal2) en cada
+  // carga/recarga; nada del Admin se renderiza hasta terminar (sin flash).
   useEffect(() => {
-    // Admin siempre pide credenciales — no reutiliza sesión activa
-    setChecking(false)
-    setLoading(false)
+    let cancelled = false
+    ;(async () => {
+      let session = null
+      try { ({ data: { session } } = await supabase.auth.getSession()) } catch { session = null }
+      if (session && !cancelled) await resolveAdminAccess(false)
+      if (!cancelled) { setChecking(false); setLoading(false) }
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // session → ¿admin? (Worker) → ¿aal2? → Admin. El Worker es la autoridad:
+  // /admin/data devuelve 403 mfa_required a un admin en aal1 y 403 a quien no es admin.
+  async function resolveAdminAccess(fromLogin) {
+    let status
+    try { status = await loadOrgs() } catch { status = 0 }
+    if (status === 200) {
+      if (await isAal2(supabase)) { setMfa(null); setIsAdmin(true); return }
+      status = 'mfa_required'
+    }
+    setIsAdmin(false)
+    if (status === 'mfa_required') {
+      const st = await getAdminMfaState(supabase)
+      if (st.level === 'challenge' || st.level === 'enroll') { setMfa({ mode: st.level, factors: st.factors ?? [] }); return }
+      setMfa(null)
+      await supabase.auth.signOut()
+      setAuthError('No pudimos verificar la autenticación en dos pasos. Intentá de nuevo.')
+      return
+    }
+    setMfa(null)
+    if (!fromLogin) return   // recarga con una sesión que no es de admin: login normal
+    await supabase.auth.signOut()
+    setAuthError(status === 401 || status === 403
+      ? 'No tenés permisos de administrador'
+      : 'El servicio no está disponible en este momento. Intentá de nuevo.')
+  }
+
+  async function handleMfaVerified() {
+    setChecking(true)
+    await resolveAdminAccess(true)
+    setChecking(false)
+  }
+
+  async function handleMfaLogout() {
+    await supabase.auth.signOut()
+    setMfa(null)
+    setIsAdmin(false)
+  }
 
   async function handleAdminLogin(e) {
     e.preventDefault()
@@ -251,34 +301,20 @@ export default function Admin() {
       return
     }
 
-    // La autorización la decide el Worker (verifyAdmin, server-side): el portal ya
-    // no consulta admin_users directamente.
-    let status
-    try {
-      status = await loadOrgs()
-    } catch {
-      status = 0
-    }
-    if (status !== 200) {
-      await supabase.auth.signOut()
-      setAuthError(status === 401 || status === 403
-        ? 'No tenés permisos de administrador'
-        : 'El servicio no está disponible en este momento. Intentá de nuevo.')
-      setAuthLoading(false)
-      return
-    }
-
-    setIsAdmin(true)
+    // La autorización la decide el Worker (verifyAdmin, server-side: admin + aal2)
+    await resolveAdminAccess(true)
     setAuthLoading(false)
   }
 
-  // Devuelve el status HTTP de /admin/data (200 = admin autorizado)
+  // Devuelve el status HTTP de /admin/data (200 = admin autorizado en aal2) o
+  // 'mfa_required' (admin válido sin el segundo factor en esta sesión)
   async function loadOrgs() {
     const token = await getAuthToken()
     const res   = await fetch(`${SCANNER_URL}/admin/data`, {
       headers: { 'Authorization': `Bearer ${token}` },
     })
     const data = await res.json().catch(() => ({}))
+    if (res.status === 403 && data?.error === 'mfa_required') return 'mfa_required'
     if (!res.ok || !data.ok) return res.status === 200 ? 500 : res.status
 
     const orgsWithData = data.orgs.map(org => {
@@ -469,6 +505,9 @@ export default function Admin() {
 
   // ── Verificando ───────────────────────────────────────────────────────────────
   if (checking) return <LoadingScreen text="Verificando acceso..." />
+
+  // ── Segundo factor (TOTP): nada del Admin antes de aal2 ───────────────────────
+  if (mfa) return <AdminMfa client={supabase} mode={mfa.mode} factors={mfa.factors} onVerified={handleMfaVerified} onLogout={handleMfaLogout} />
 
   // ── Login ─────────────────────────────────────────────────────────────────────
   if (!isAdmin) return (

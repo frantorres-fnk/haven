@@ -10,13 +10,21 @@ import { createRoot } from 'react-dom/client'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
+let sessionToken = null   // la sesión existe recién después de signInWithPassword
+let nextLoginToken = 'tok-admin'
 const auth = {
   getUser: vi.fn(async () => ({ data: { user: null }, error: null })),
-  getSession: vi.fn(async () => ({ data: { session: null }, error: null })),
-  signOut: vi.fn(async () => ({ error: null })),
-  signInWithPassword: vi.fn(async () => ({ data: {}, error: null })),
+  getSession: vi.fn(async () => ({ data: { session: sessionToken ? { access_token: sessionToken } : null }, error: null })),
+  signOut: vi.fn(async () => { sessionToken = null; return { error: null } }),
+  signInWithPassword: vi.fn(async () => { sessionToken = nextLoginToken; return { data: {}, error: null } }),
   onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe() {} } } })),
+  // Admin con MFA ya completado en esta sesión (el flujo MFA se prueba en admin-mfa.test.jsx)
+  mfa: {
+    getAuthenticatorAssuranceLevel: vi.fn(async () => ({ data: { currentLevel: 'aal2', nextLevel: 'aal2' }, error: null })),
+    listFactors: vi.fn(async () => ({ data: { all: [], totp: [] }, error: null })),
+  },
 }
+
 vi.mock('../lib/supabase', () => {
   const chain = () => new Proxy(() => {}, {
     get: (_, k) => (k === 'then' ? (res) => res({ data: null, error: null }) : chain()),
@@ -55,7 +63,8 @@ async function adminLogin() {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  auth.getSession.mockResolvedValue({ data: { session: null }, error: null })
+  sessionToken = null
+  nextLoginToken = 'tok-admin'
 })
 afterEach(async () => {
   await act(async () => root.unmount())
@@ -84,7 +93,7 @@ describe('autorización del portal Admin (server-side vía /admin/data)', () => 
   it('5. tras el login consulta /admin/data con el token de la sesión', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, orgs: [], domains: [], scans: [], findings: [], admins: [] }), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
-    auth.getSession.mockResolvedValue({ data: { session: { access_token: 'tok-admin' } }, error: null })
+    nextLoginToken = 'tok-admin'
     await renderAt('/admin')
     await adminLogin()
     expect(auth.signInWithPassword).toHaveBeenCalledWith({ email: 'alguien@empresa.com', password: 'no-importa' })
@@ -95,7 +104,7 @@ describe('autorización del portal Admin (server-side vía /admin/data)', () => 
 
   it.each([[401], [403]])('6. usuario no admin (%i): signOut, "No tenés permisos de administrador" y no entra al portal', async (status) => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'forbidden' }), { status })))
-    auth.getSession.mockResolvedValue({ data: { session: { access_token: 'tok-cliente' } }, error: null })
+    nextLoginToken = 'tok-cliente'
     await renderAt('/admin')
     await adminLogin()
     expect(auth.signOut).toHaveBeenCalledTimes(2)     // antes del login y al negar el acceso

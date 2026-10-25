@@ -78,6 +78,13 @@ describe('rutas sin sesión', () => {
     expect(window.location.pathname).toBe('/admin')
     expect(text()).toContain('Acceso restringido')
     expect(text()).toContain('Solo administradores de Haven')
+    // login admin completo y sin el enlace de contacto
+    expect(container.querySelector('input[type="email"]')).toBeTruthy()
+    expect(container.querySelector('input[type="password"]')).toBeTruthy()
+    expect(text()).toContain('Ingresar al panel')
+    expect(text()).not.toContain('¿Problemas para entrar?')
+    expect(text()).not.toContain('Contactá al equipo')
+    expect(container.querySelector('a[href^="mailto:"]')).toBeNull()
     expect(auth.getUser).not.toHaveBeenCalled()      // RequireAccount no intervino
   })
 

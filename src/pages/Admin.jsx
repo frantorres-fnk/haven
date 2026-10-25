@@ -564,7 +564,6 @@ export default function Admin() {
           to   { opacity: 1; transform: translateY(0); }
         }
         .adm-card { animation: adm-up .5s cubic-bezier(.4,0,.2,1) .06s both; }
-        a.adm-link:hover { color: #aab8ff !important; }
       `}</style>
 
       <div style={{
@@ -763,14 +762,6 @@ export default function Admin() {
               {authLoading ? 'Verificando...' : 'Ingresar al panel →'}
             </button>
           </form>
-
-          <p style={{ textAlign: 'center', fontSize: 12.5, color: C.t3, marginTop: 20 }}>
-            ¿Problemas para entrar?{' '}
-            <a href="mailto:hola@fenikso.io" className="adm-link"
-              style={{ color: C.link, textDecoration: 'none', fontWeight: 500, transition: 'color .15s' }}>
-              Contactá al equipo
-            </a>
-          </p>
         </div>
       </div>
     </>

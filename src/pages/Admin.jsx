@@ -6,6 +6,8 @@ import Wordmark from '../components/Wordmark'
 import AdminFindingDetail from '../components/AdminFindingDetail'
 import EndTrialModal from '../components/EndTrialModal'
 import AdminMfa from '../components/AdminMfa'
+import AdminSecurityModal from '../components/AdminSecurityModal'
+import { MSG as PASSWORD_MSG } from '../lib/adminPassword'
 import { getAdminMfaState, isAal2 } from '../lib/adminMfa'
 import CreateClientModal from '../components/CreateClientModal'
 import { resendClientAccess, accessText } from '../lib/adminProvisioning'
@@ -200,6 +202,8 @@ export default function Admin() {
   const [checking, setChecking]       = useState(true)
   // MFA obligatorio: null | { mode: 'enroll' | 'challenge', factors }
   const [mfa, setMfa]                 = useState(null)
+  const [showSecurity, setShowSecurity] = useState(false)
+  const [authNotice, setAuthNotice]   = useState('')
   const [activeTab, setActiveTab]     = useState('clients')
   const [newAdmin, setNewAdmin]       = useState({ email: '', name: '' })
   const [addingAdmin, setAddingAdmin] = useState(false)
@@ -296,15 +300,40 @@ export default function Admin() {
     setShowCreateClient(false)
     setAccessAction({})
     setReportResend({})
+    setShowSecurity(false)
     setAuthPassword('')
     setAuthError('')
+    setAuthNotice('')
     navigate('/admin', { replace: true })
+  }
+
+  // "Seguridad de la cuenta": además de estar en el Admin, la sesión tiene que
+  // ser aal2 en este momento; si no, vuelve al flujo MFA.
+  async function sendBackToMfa() {
+    setShowSecurity(false)
+    const st = await getAdminMfaState(supabase)
+    setIsAdmin(false)
+    if (st.level === 'challenge' || st.level === 'enroll') { setMfa({ mode: st.level, factors: st.factors ?? [] }); return }
+    await handleAdminLogout()
+  }
+
+  async function openSecurity() {
+    if (await isAal2(supabase)) setShowSecurity(true)
+    else await sendBackToMfa()
+  }
+
+  // Después del cambio: se cierra la sesión (todas) y hay que volver a entrar con
+  // la nueva contraseña + MFA. Nunca a /login (portal tenant).
+  async function handlePasswordChanged() {
+    await handleAdminLogout()
+    setAuthNotice(`${PASSWORD_MSG.success} Ingresá con tu nueva contraseña y tu código de verificación.`)
   }
 
   async function handleAdminLogin(e) {
     e.preventDefault()
     setAuthLoading(true)
     setAuthError('')
+    setAuthNotice('')
     await supabase.auth.signOut()
 
     const { error } = await supabase.auth.signInWithPassword({
@@ -692,6 +721,15 @@ export default function Admin() {
             </div>
 
             {/* Error */}
+            {authNotice && (
+              <div role="status" style={{
+                background: 'rgba(61,220,132,.08)', border: '1px solid rgba(61,220,132,.25)',
+                borderRadius: 9, padding: '10px 14px', marginBottom: 18,
+                fontSize: 13, color: '#86efac',
+              }}>
+                {authNotice}
+              </div>
+            )}
             {authError && (
               <div style={{
                 background: 'rgba(242,99,126,.1)', border: '1px solid rgba(242,99,126,.25)',
@@ -769,6 +807,13 @@ export default function Admin() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={openSecurity} style={{
+              fontFamily: C.body, fontSize: 13, color: C.t3,
+              background: 'none', border: 'none',
+              padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+            }}>
+              Seguridad de la cuenta
+            </button>
             <button onClick={handleAdminLogout} style={{
               fontFamily: C.body, fontSize: 13, color: C.t3,
               background: 'none', border: 'none',
@@ -1647,6 +1692,15 @@ export default function Admin() {
           getToken={getAuthToken}
           onClose={async () => { setShowCreateClient(false); try { await loadOrgs() } catch { /* recargar a mano */ } }}
           onViewClient={viewClient}
+        />
+      )}
+
+      {showSecurity && (
+        <AdminSecurityModal
+          client={supabase}
+          onClose={() => setShowSecurity(false)}
+          onPasswordChanged={handlePasswordChanged}
+          onMfaRequired={sendBackToMfa}
         />
       )}
 

@@ -233,6 +233,73 @@ describe('flujo /admin con MFA', () => {
   })
 })
 
+// ── Logout del portal Admin: siempre a /admin, nunca a /login (tenant) ─────────
+describe('logout del Admin → /admin', () => {
+  const expectBackOnAdminLogin = () => {
+    expect(window.location.pathname).toBe('/admin')
+    expect(window.location.pathname).not.toBe('/login')
+    expect(w.session).toBeNull()
+    expect(text()).toContain('Acceso restringido')                     // login administrativo
+    expect(container.querySelector('input[type="password"]')).toBeTruthy()
+    expect(adminVisible()).toBe(false)
+    expect(text()).not.toContain('Verificación en dos pasos')
+    expect(text()).not.toContain('Protegé tu acceso administrativo')
+  }
+
+  it('1/4. dashboard (aal2) → Cerrar sesión → /admin con login admin, sin sesión ni contenido Admin', async () => {
+    w.session = 'admin'; w.aal = 'aal2'
+    await mount()
+    expect(text()).toContain('Cliente Confidencial SA')
+    await act(async () => { button('Cerrar sesión').click() })
+    await flush()
+    expectBackOnAdminLogin()
+    expect(auth.signOut).toHaveBeenCalledTimes(1)
+    expect(container.querySelector('input[type="password"]').value).toBe('')
+  })
+
+  it('2. enrolamiento → Cerrar sesión → /admin (también con el QR ya generado)', async () => {
+    await mount()
+    await login()
+    expect(text()).toContain('Protegé tu acceso administrativo')
+    await act(async () => { button('Configurar autenticador').click() })
+    await flush()
+    expect(container.querySelector('img[alt^="Código QR"]')).toBeTruthy()
+    await act(async () => { button('Cerrar sesión').click() })
+    await flush()
+    expectBackOnAdminLogin()
+    expect(container.querySelector('img[alt^="Código QR"]')).toBeNull()
+  })
+
+  it('3. challenge → Cerrar sesión → /admin', async () => {
+    w.factors = [{ id: 'f-1', factor_type: 'totp', status: 'verified' }]
+    await mount()
+    await login()
+    expect(text()).toContain('Verificación en dos pasos')
+    await act(async () => { button('Cerrar sesión').click() })
+    await flush()
+    expectBackOnAdminLogin()
+  })
+
+  it('después del logout se puede volver a entrar (login → MFA de nuevo)', async () => {
+    w.session = 'admin'; w.aal = 'aal2'
+    w.factors = [{ id: 'f-1', factor_type: 'totp', status: 'verified' }]
+    await mount()
+    await act(async () => { button('Cerrar sesión').click() })
+    await flush()
+    await login()
+    expect(text()).toContain('Verificación en dos pasos')
+    expect(window.location.pathname).toBe('/admin')
+  })
+
+  it('el portal Admin no navega a /login en ningún logout (código)', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { fileURLToPath } = await import('node:url')
+    const { join, dirname } = await import('node:path')
+    const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../pages/Admin.jsx'), 'utf8')
+    expect(src).not.toMatch(/navigate\('\/login'/)
+  })
+})
+
 describe('lib/adminMfa', () => {
   const client = { auth }
   it('estado: aal2 / challenge (solo factores verificados) / enroll', async () => {

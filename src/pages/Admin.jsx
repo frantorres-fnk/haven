@@ -280,10 +280,25 @@ export default function Admin() {
     setChecking(false)
   }
 
-  async function handleMfaLogout() {
+  // Logout del portal Admin (dashboard y pantallas MFA): siempre vuelve a /admin
+  // (login administrativo), nunca a /login (portal tenant).
+  async function handleAdminLogout() {
     await supabase.auth.signOut()
     setMfa(null)
     setIsAdmin(false)
+    setOrgs([])
+    setAdmins([])
+    setOrgFindings({})
+    setFindingsPanel({})
+    setModal(null)
+    setDetailFindingId(null)
+    setEndTrialOrg(null)
+    setShowCreateClient(false)
+    setAccessAction({})
+    setReportResend({})
+    setAuthPassword('')
+    setAuthError('')
+    navigate('/admin', { replace: true })
   }
 
   async function handleAdminLogin(e) {
@@ -372,10 +387,6 @@ export default function Admin() {
     await loadOrgs()
   }
 
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    navigate('/login')
-  }
 
   // ── Hallazgos por organización (lazy) ──────────────────────────────────────
   async function loadOrgFindings(orgId) {
@@ -507,7 +518,7 @@ export default function Admin() {
   if (checking) return <LoadingScreen text="Verificando acceso..." />
 
   // ── Segundo factor (TOTP): nada del Admin antes de aal2 ───────────────────────
-  if (mfa) return <AdminMfa client={supabase} mode={mfa.mode} factors={mfa.factors} onVerified={handleMfaVerified} onLogout={handleMfaLogout} />
+  if (mfa) return <AdminMfa client={supabase} mode={mfa.mode} factors={mfa.factors} onVerified={handleMfaVerified} onLogout={handleAdminLogout} />
 
   // ── Login ─────────────────────────────────────────────────────────────────────
   if (!isAdmin) return (
@@ -758,7 +769,7 @@ export default function Admin() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button onClick={handleLogout} style={{
+            <button onClick={handleAdminLogout} style={{
               fontFamily: C.body, fontSize: 13, color: C.t3,
               background: 'none', border: 'none',
               padding: '6px 12px', borderRadius: 8, cursor: 'pointer',

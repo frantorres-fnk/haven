@@ -5,11 +5,9 @@ import { resolveMembership } from '../lib/membership'
 import { fetchLatestScanCard } from '../lib/domainStats'
 import { requestScan } from '../lib/scan'
 import Wordmark from '../components/Wordmark'
+import { getOrganizationDomainLimit, CAPACITY_REQUEST_MAILTO } from '../lib/capacity'
 
 const SCANNER_URL = import.meta.env.VITE_SCANNER_URL || 'https://scanner.franzthorres.workers.dev'
-const PLAN_LIMITS = { advanced: 1, premium: 3, elite: 6 }
-// Mismo criterio que el Worker: el cupo interno por plan, ampliable con domain_limit
-const domainLimit = (org) => Math.max(PLAN_LIMITS[org?.plan] ?? 1, Number(org?.domain_limit) || 0)
 
 // ─── Design tokens (mismos que Dashboard) ───────────────────────────────────
 const C = {
@@ -365,10 +363,9 @@ export default function Domains() {
   async function handleAddDomain(e) {
     e.preventDefault()
     setError('')
-    const limit = domainLimit(org)
-    const supplierCount = domains.filter(d => d.domain_type === 'supplier').length
-    if (supplierCount >= limit - 1) {
-      setError(`Tu entorno HAVEN permite hasta ${limit} ${limit === 1 ? 'dominio' : 'dominios'} en total. Contactá a FENIKSO para ampliarlo.`)
+    // Ayuda de UI: la capacidad la aplican el Worker y la DB
+    if (domains.length >= getOrganizationDomainLimit(org)) {
+      setError('Alcanzaste la capacidad de dominios de tu organización.')
       return
     }
     const cleanDomain = form.domain.toLowerCase()
@@ -379,7 +376,7 @@ export default function Domains() {
       return
     }
     setAdding(true)
-    // Alta server-side: el Worker valida rol y límite del plan y marca el proveedor
+    // Alta server-side: el Worker valida rol y capacidad de la org y marca el proveedor
     // como monitoreado (el cliente ya no puede escribir verified/monitoring_active).
     let domainId
     let session
@@ -429,7 +426,7 @@ export default function Domains() {
     await loadData()
   }
 
-  const limit  = domainLimit(org)
+  const limit  = getOrganizationDomainLimit(org)
   const canAdd = domains.length < limit
 
   const inputStyle = (field) => ({
@@ -517,16 +514,9 @@ export default function Domains() {
           </div>
 
           {/* Derecha: contador */}
-          <div style={{
-            fontFamily: C.mono, fontSize: 13, color: C.t2,
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            <span style={{ color: C.t1, fontWeight: 700 }}>{domains.length}</span>
-            <span>/</span>
-            <span>{limit}</span>
-            <span style={{ color: C.t3 }}>
-              dominio{limit !== 1 ? 's' : ''}
-            </span>
+          <div data-testid="domain-capacity" style={{ fontFamily: C.mono, fontSize: 13, color: C.t2, textAlign: 'right' }}>
+            <span style={{ color: C.t3 }}>Dominios monitoreados:</span>{' '}
+            <span style={{ color: C.t1, fontWeight: 700 }}>{domains.length}</span> de {limit}
           </div>
         </div>
       </header>
@@ -668,13 +658,13 @@ export default function Domains() {
           }}>
             <Icon name="shield" size={28} color={C.link} />
             <p style={{ fontSize: 15, color: C.t1, marginTop: 14, marginBottom: 6 }}>
-              Alcanzaste el límite de dominios de tu entorno
+              Alcanzaste la capacidad de dominios de tu organización.
             </p>
             <p style={{ fontSize: 13, color: C.t2, marginBottom: 20, lineHeight: 1.6 }}>
-              Si necesitás monitorear más dominios, contactanos y lo ampliamos.
+              Si necesitás monitorear más dominios, solicitá una ampliación.
             </p>
             <a
-              href="mailto:hola@fenikso.io"
+              href={CAPACITY_REQUEST_MAILTO}
               style={{
                 fontFamily: C.title, fontWeight: 700, fontSize: 14,
                 color: '#fff', background: C.accentGrad,
@@ -682,7 +672,7 @@ export default function Domains() {
                 textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 7,
               }}
             >
-              Hablar con un especialista
+              Solicitar ampliación
               <Icon name="arrow-right" size={14} color="#fff" />
             </a>
           </div>

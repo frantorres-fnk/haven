@@ -11,6 +11,8 @@ import { MSG as PASSWORD_MSG } from '../lib/adminPassword'
 import { getAdminMfaState, isAal2 } from '../lib/adminMfa'
 import CreateClientModal from '../components/CreateClientModal'
 import ServiceLifecycleModal from '../components/ServiceLifecycleModal'
+import CapacityModal from '../components/CapacityModal'
+import { getOrganizationDomainLimit } from '../lib/capacity'
 import { serviceSummary } from '../lib/serviceLifecycle'
 import { resendClientAccess, accessText } from '../lib/adminProvisioning'
 import { orgLifecycleActions, trialReportBadge, resendTrialReport } from '../lib/trialClosure'
@@ -224,6 +226,7 @@ export default function Admin() {
   const [endTrialOrg,     setEndTrialOrg]     = useState(null)
   const [showCreateClient, setShowCreateClient] = useState(false)
   const [serviceOrg,      setServiceOrg]      = useState(null)
+  const [capacityOrg,     setCapacityOrg]     = useState(null)
   const [highlightOrg,    setHighlightOrg]    = useState(null)
   const [accessAction,    setAccessAction]    = useState({})
   const [reportResend,    setReportResend]    = useState({})
@@ -1068,6 +1071,11 @@ export default function Admin() {
                               () => { setModalError(''); setModal({ type: isPaused ? 'resume' : 'pause', org }) }
                             )}
                           </div>
+                          <div data-testid={`capacity-${org.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: C.mono, fontSize: 11, color: C.t2 }}>
+                            <span style={{ color: C.t3, letterSpacing: '.05em' }}>CAPACIDAD</span>
+                            <span>Dominios: <span style={{ color: C.t1, fontWeight: 700 }}>{org.domains.length} / {getOrganizationDomainLimit(org)}</span></span>
+                            {btnSm('Modificar capacidad', () => setCapacityOrg(org))}
+                          </div>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                             {btnSm('Acceso y vigencia', () => setServiceOrg(org))}
                             {btnSm('Facturación', () => { setModalError(''); setSelectedBilling(org.billing_type || 'stripe'); setActivateOnBilling(false); setModal({ type: 'billing-type', org }) })}
@@ -1696,6 +1704,18 @@ export default function Admin() {
           onClose={() => setServiceOrg(null)}
           onSaved={async () => { try { await loadOrgs() } catch { /* recargar a mano */ } }}
           onMfaRequired={() => { setServiceOrg(null); sendBackToMfa() }}
+        />
+      )}
+
+      {capacityOrg && (
+        <CapacityModal
+          org={capacityOrg}
+          domainCount={capacityOrg.domains.length}
+          scannerUrl={SCANNER_URL}
+          getToken={getAuthToken}
+          onClose={() => setCapacityOrg(null)}
+          onSaved={async () => { try { await loadOrgs() } catch { /* recargar a mano */ } }}
+          onMfaRequired={() => { setCapacityOrg(null); sendBackToMfa() }}
         />
       )}
 

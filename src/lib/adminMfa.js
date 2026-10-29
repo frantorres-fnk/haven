@@ -52,7 +52,7 @@ export async function isAal2(client) {
  * crea uno nuevo. Nunca toca factores verificados; si ya hay uno, no enrola.
  * → { ok, factorId, qr, secret } | { ok: false, error }
  */
-export async function startEnrollment(client) {
+export async function startEnrollment(client, friendlyName = MFA_FRIENDLY_NAME) {
   try {
     const all = await listAll(client)
     if (verifiedTotp(all).length) return { ok: false, error: 'Ya tenés un autenticador configurado.' }
@@ -60,7 +60,7 @@ export async function startEnrollment(client) {
       const { error } = await client.auth.mfa.unenroll({ factorId: f.id })
       if (error) return { ok: false, error: GENERIC }
     }
-    const { data, error } = await client.auth.mfa.enroll({ factorType: 'totp', friendlyName: MFA_FRIENDLY_NAME, issuer: 'HAVEN' })
+    const { data, error } = await client.auth.mfa.enroll({ factorType: 'totp', friendlyName, issuer: 'HAVEN' })
     if (error || !data?.id || !data?.totp) return { ok: false, error: GENERIC }
     return { ok: true, factorId: data.id, qr: data.totp.qr_code, secret: data.totp.secret }
   } catch {

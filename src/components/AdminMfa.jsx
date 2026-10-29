@@ -15,7 +15,12 @@ const APPS = ['Google Authenticator', 'Microsoft Authenticator', '1Password', 'A
  *   'enroll'    → sin MFA: enrolamiento obligatorio (QR + secret de Supabase)
  * El secret/QR solo viven en el estado de este componente; nunca se guardan.
  */
-export default function AdminMfa({ client, mode, factors = [], onVerified, onLogout }) {
+// Reutilizado por el Partner Hub (MFA obligatorio para usuarios Partner): solo cambian
+// los textos y el nombre del factor; el flujo y las garantías son los mismos.
+export default function AdminMfa({ client, mode, factors = [], onVerified, onLogout,
+  enrollTitle = 'Protegé tu acceso administrativo',
+  enrollIntro = 'El acceso al portal administrativo de HAVEN requiere autenticación en dos pasos.',
+  friendlyName, header = null }) {
   const [enrollment, setEnrollment] = useState(null)   // { factorId, qr, secret }
   const [factorId, setFactorId] = useState(factors[0]?.id ?? null)
   const [code, setCode] = useState('')
@@ -29,7 +34,7 @@ export default function AdminMfa({ client, mode, factors = [], onVerified, onLog
     if (inFlight.current) return
     inFlight.current = true
     setBusy(true); setError('')
-    const r = await startEnrollment(client)
+    const r = await startEnrollment(client, ...(friendlyName ? [friendlyName] : []))
     inFlight.current = false
     setBusy(false)
     if (r.ok) setEnrollment({ factorId: r.factorId, qr: r.qr, secret: r.secret })
@@ -71,7 +76,7 @@ export default function AdminMfa({ client, mode, factors = [], onVerified, onLog
   return (
     <div style={{ minHeight: '100vh', background: K.bg, display: 'grid', placeItems: 'center', padding: 20, fontFamily: K.body }}>
       <div style={{ width: '100%', maxWidth: 420 }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 22 }}><Wordmark size={34} /></div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 22 }}>{header ?? <Wordmark size={34} />}</div>
         <div style={{ background: K.card, border: `1px solid ${K.border}`, borderRadius: 18, padding: '28px 28px 24px', backdropFilter: 'blur(8px)' }}>
           {mode === 'challenge' && (<>
             <h1 style={{ fontFamily: K.title, fontSize: 20, color: K.t1, margin: '0 0 8px' }}>Verificación en dos pasos</h1>
@@ -89,8 +94,8 @@ export default function AdminMfa({ client, mode, factors = [], onVerified, onLog
           </>)}
 
           {mode === 'enroll' && !enrollment && (<>
-            <h1 style={{ fontFamily: K.title, fontSize: 20, color: K.t1, margin: '0 0 8px' }}>Protegé tu acceso administrativo</h1>
-            <p style={{ fontSize: 13.5, color: K.t2, lineHeight: 1.6, margin: '0 0 20px' }}>El acceso al portal administrativo de HAVEN requiere autenticación en dos pasos.</p>
+            <h1 style={{ fontFamily: K.title, fontSize: 20, color: K.t1, margin: '0 0 8px' }}>{enrollTitle}</h1>
+            <p style={{ fontSize: 13.5, color: K.t2, lineHeight: 1.6, margin: '0 0 20px' }}>{enrollIntro}</p>
             {error && <p role="alert" style={{ color: K.red, fontSize: 13, margin: '0 0 12px' }}>{error}</p>}
             <button onClick={begin} disabled={busy}
               style={{ width: '100%', height: 46, fontFamily: K.title, fontWeight: 700, fontSize: 14.5, color: '#fff', background: K.accentBtn, border: 'none', borderRadius: 10, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? .6 : 1 }}>

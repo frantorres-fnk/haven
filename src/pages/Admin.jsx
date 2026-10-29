@@ -12,6 +12,7 @@ import { getAdminMfaState, isAal2 } from '../lib/adminMfa'
 import CreateClientModal from '../components/CreateClientModal'
 import ServiceLifecycleModal from '../components/ServiceLifecycleModal'
 import CapacityModal from '../components/CapacityModal'
+import AdminPartners from '../components/AdminPartners'
 import { getOrganizationDomainLimit } from '../lib/capacity'
 import { serviceSummary } from '../lib/serviceLifecycle'
 import { resendClientAccess, accessText } from '../lib/adminProvisioning'
@@ -871,6 +872,7 @@ export default function Admin() {
             {[
               { key: 'clients', label: `Clientes (${stats.total})` },
               { key: 'admins',  label: `Admins (${admins.length})`  },
+              { key: 'partners', label: 'Partners' },
             ].map(t => (
               <button key={t.key} onClick={() => setActiveTab(t.key)} style={{
                 fontFamily: C.title, fontWeight: 600, fontSize: 13,
@@ -1303,6 +1305,11 @@ export default function Admin() {
                 )
               })}
             </div>
+          )}
+
+          {/* ── PARTNERS ─────────────────────────────────────────────────────── */}
+          {activeTab === 'partners' && (
+            <AdminPartners orgs={orgs} onOpenService={(orgId) => { const o = orgs.find(x => x.id === orgId); if (o) setServiceOrg(o) }} />
           )}
 
           {/* ── ADMINS ───────────────────────────────────────────────────────── */}

@@ -11,6 +11,8 @@ import PasswordRequired from './pages/PasswordRequired'
 import Account from './pages/Account'
 import OnboardingDomain from './pages/OnboardingDomain'
 import RequireAccount from './components/RequireAccount'
+import PartnerApp from './pages/partner/PartnerApp'
+import PartnerAcceptInvite from './pages/partner/PartnerAcceptInvite'
 
 function App() {
   return (
@@ -24,6 +26,9 @@ function App() {
         <Route path="/domains" element={<RequireAccount><Domains /></RequireAccount>} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/admin" element={<Admin />} />
+        {/* Partner Hub: separado del Tenant Portal y de FENIKSO Admin (guard propio, sin RequireAccount) */}
+        <Route path="/partner/accept-invite" element={<PartnerAcceptInvite />} />
+        <Route path="/partner/*" element={<PartnerApp />} />
         <Route path="/accept-invite" element={<AcceptInvite />} />
         <Route path="/account" element={<RequireAccount><Account /></RequireAccount>} />
         <Route path="/onboarding/domain" element={<RequireAccount><OnboardingDomain /></RequireAccount>} />

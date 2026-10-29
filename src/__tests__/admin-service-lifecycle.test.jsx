@@ -185,10 +185,19 @@ describe('lógica de presentación y payload', () => {
 
 describe('el tenant no puede modificar la vigencia', () => {
   it('ninguna pantalla del portal cliente usa el endpoint ni la lógica de vigencia', () => {
-    const pages = readdirSync(join(here, '../pages')).filter(f => f !== 'Admin.jsx')
+    // Solo páginas del portal cliente (pages/partner/ es el Partner Hub: abajo)
+    const pages = readdirSync(join(here, '../pages')).filter(f => f.endsWith('.jsx') && f !== 'Admin.jsx')
     for (const f of pages) {
       const src = readFileSync(join(here, '../pages', f), 'utf8')
       expect([f, /service_type|service_ends_at|\/service['`]|serviceLifecycle/.test(src)]).toEqual([f, false])
+    }
+  })
+
+  it('el Partner Hub solo MUESTRA la vigencia: nunca llama al endpoint de vigencia ni a /admin', () => {
+    const dir = join(here, '../pages/partner')
+    for (const f of readdirSync(dir)) {
+      const src = readFileSync(join(dir, f), 'utf8')
+      expect([f, /\/service['`]|\/admin\/|updateServiceLifecycle|serviceLifecycle/.test(src)]).toEqual([f, false])
     }
   })
 })

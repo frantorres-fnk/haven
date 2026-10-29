@@ -10,6 +10,7 @@ import { surfaceAreaStatus } from '../lib/surface'
 import CredentialsPanel from '../components/CredentialsPanel'
 import ResendVerificationButton from '../components/ResendVerificationButton'
 import Wordmark from '../components/Wordmark'
+import ManagedBy from '../components/ManagedBy'
 import ScoreEvolution from '../components/ScoreEvolution'
 
 const SCANNER_URL_BASE = import.meta.env.VITE_SCANNER_URL || 'https://scanner.franzthorres.workers.dev'
@@ -1059,7 +1060,10 @@ export default function Dashboard() {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           height: 64, gap: 10,
         }}>
-          <Wordmark size={32} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+            <Wordmark size={32} />
+            {!isMobile && !adminView && <ManagedBy />}
+          </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {!isMobile && (

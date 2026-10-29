@@ -197,7 +197,10 @@ FENIKSO puede invitar cualquier rol (incluido owner) y desactivar usuarios Partn
 - `admin_actions` (FENIKSO): `partner_created`, `partner_status_changed`, `partner_updated`,
   `partner_user_invited|updated`, `partner_invite_revoked`, `partner_associated`,
   `partner_disassociated`, `capacity_changed`, `capacity_request_approved|rejected`,
-  `service_request_approved|rejected`. Las acciones sin org usan `org_id = null`.
+  `service_request_approved|rejected`. Las acciones de FENIKSO sobre un Partner (sin organization)
+  usan `org_id = null` con `detail.partner_id` obligatorio: la migración vuelve `org_id` nullable
+  y agrega `admin_actions_scope_check` (org_id **o** partner_id uuid). Las filas existentes y la
+  FK de `org_id` no cambian.
 
 ## Frontend
 

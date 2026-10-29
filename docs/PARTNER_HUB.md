@@ -113,8 +113,8 @@ con opciones de Partner:
 - `domain_limit = 6` explícito;
 - `contract`, `manual`, fechas, `domain_limit`, `plan`, `status` en el body → **403**
   `not_allowed_for_partner` (lo decide FENIKSO);
-- owner nuevo **sin contraseña temporal**: contraseña aleatoria que nadie conoce + link de
-  recuperación de Supabase Auth (`/reset-password`). Un email que **ya tiene cuenta HAVEN**
+- owner nuevo **sin contraseña temporal**: contraseña aleatoria que nadie conoce + email
+  HAVEN **"Definí tu contraseña"** (ver *Onboarding del owner* abajo). Un email que **ya tiene cuenta HAVEN**
   no puede ser owner de un alta del Partner (sería asignarle una org sin su consentimiento):
   eso lo hace FENIKSO;
 - dominio / nombre / email en uso → **un único `409 client_conflict` genérico** (sin oráculo
@@ -128,6 +128,26 @@ con opciones de Partner:
 
 El Partner no puede extender, convertir, poner sin vencimiento ni reactivar: "Solicitar
 extensión / activación".
+
+### Onboarding del owner (dos emails, ninguno de Supabase)
+
+1. **"Tu acceso a HAVEN está listo"** (bienvenida, co-branded): usuario, paso 1 = buscar el
+   email "Definí tu contraseña", paso 2 = confirmar el dominio. **Sin** botón "Ingresar a
+   HAVEN" (todavía no hay contraseña). El alta de FENIKSO Admin con contraseña temporal
+   conserva su CTA.
+2. **"Definí tu contraseña de HAVEN"** (co-branded, botón **Definir contraseña**): el Worker
+   pide el token a `POST /auth/v1/admin/generate_link` (`type=recovery`, **no envía mail**) y
+   arma `https://haven.fenikso.io/reset-password?token_hash=…&type=recovery`. Lo manda por
+   Resend desde `HAVEN by Fenikso <noreply@fenikso.io>`, **sin BCC** (el link da acceso a la
+   cuenta). El token no se guarda, no se loguea y nunca vuelve en la respuesta al Partner.
+3. `/reset-password` lee el `token_hash`, lo saca de la URL y lo canjea (`verifyOtp`) **recién
+   al enviar el formulario** — abrir el link (o un escáner de correo) no lo consume. Después:
+   tenant → su portal (`accountRoute`), usuario Partner → `/partner` (pide MFA).
+4. Si el link venció: "¿Olvidaste tu contraseña?" → template de Supabase Auth personalizado
+   (genérico HAVEN, mismo formato token_hash). Ver `docs/AUTH_EMAILS.md`.
+
+Si `generate_link` o el envío fallan, el alta queda hecha y la respuesta trae
+`password_setup_sent: false` + aviso.
 
 ## Solicitudes
 

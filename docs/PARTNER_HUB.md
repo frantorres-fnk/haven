@@ -220,15 +220,19 @@ El frontend es solo UX: la autoridad es el Worker.
 
 ## Deploy
 
-1. `PARTNER_HUB_PRECHECK.sql` (fuera del repo) → todo `ok`.
+1. `ops/sql/partner-hub/precheck.sql` → todo `ok`.
 2. Migración `20261030120000_partner_hub.sql`. Si el bucket no se pudo crear (WARNING),
    crearlo a mano: Storage → New bucket `partner-branding`, **public**, 512 KB,
    `image/png, image/jpeg, image/webp`, sin policies.
-3. `PARTNER_HUB_POSTCHECK.sql` → todo `ok`.
+3. `ops/sql/partner-hub/postcheck.sql` → todo `ok`.
 4. Worker: `npx wrangler deploy`.
 5. Frontend: `git push origin main`.
 6. Smoke con entidades descartables (`ZZ PARTNER SMOKE`, `ZZ CLIENT PARTNER SMOKE`) →
-   `PARTNER_HUB_SMOKE_VERIFY.sql` → `PARTNER_HUB_SMOKE_CLEANUP.sql`.
+   `ops/sql/partner-hub/smoke.sql` → `ops/sql/partner-hub/cleanup.sql`.
+
+Los artefactos operativos viven en `ops/sql/<feature>/` (precheck, postcheck, smoke,
+cleanup, README). `/ops/` está excluido del repo público (`.git/info/exclude`), igual que
+`supabase/migrations/` y `supabase/tests/`.
 
 ## Límites V1 (fuera de alcance)
 

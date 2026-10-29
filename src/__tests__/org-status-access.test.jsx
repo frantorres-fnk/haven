@@ -90,13 +90,27 @@ describe.each([['cancelled'], ['past_due']])('org %s', (status) => {
   })
 })
 
+describe('expired (contrato vencido)', () => {
+  it.each(PROTECTED)('%s → "Acceso finalizado" con el texto de servicio vencido y CTA a FENIKSO (sin acceso)', async (path) => {
+    world.orgStatus = 'expired'
+    await renderAt(path)
+    expect(text()).toContain('Acceso finalizado')
+    expect(text()).toContain('El servicio HAVEN se encuentra vencido. El monitoreo está pausado.')
+    const cta = [...container.querySelectorAll('a')].find(a => a.textContent === 'Contactar a FENIKSO')
+    expect(cta.getAttribute('href')).toMatch(/^mailto:hola@fenikso\.io\?subject=/)
+    expect(text()).not.toContain('openit.com.ar')
+    expect(world.from).not.toContain('domains')
+    expect(world.from).not.toContain('findings')
+  })
+})
+
 describe('trial_ended', () => {
   it.each(PROTECTED)('%s → "Acceso finalizado" con el texto de fin de prueba y CTA comercial (sin acceso)', async (path) => {
     world.orgStatus = 'trial_ended'
     await renderAt(path)
     expect(text()).toContain('Acceso finalizado')
-    expect(text()).toContain('El período de prueba de esta organización finalizó. Si querés continuar utilizando HAVEN, contactá a FENIKSO.')
-    const cta = [...container.querySelectorAll('a')].find(a => a.textContent === 'Quiero continuar con HAVEN')
+    expect(text()).toContain('Tu período de evaluación de HAVEN finalizó. El monitoreo se encuentra pausado.')
+    const cta = [...container.querySelectorAll('a')].find(a => a.textContent === 'Contactar a FENIKSO')
     expect(cta.getAttribute('href')).toMatch(/^mailto:hola@fenikso\.io\?subject=/)
     expect(text()).not.toContain('openit.com.ar')
     expect(world.from).not.toContain('domains')
@@ -108,7 +122,7 @@ describe('trial_ended', () => {
       ? new Response(JSON.stringify({ ok: true, org_status: 'trial_ended' }), { status: 200 })
       : new Response('{}', { status: 200 })))
     await renderAt('/dashboard')
-    expect(text()).toContain('El período de prueba de esta organización finalizó.')
+    expect(text()).toContain('Tu período de evaluación de HAVEN finalizó.')
   })
 
   it('si el Worker no responde, texto genérico (nunca se rompe la pantalla)', async () => {

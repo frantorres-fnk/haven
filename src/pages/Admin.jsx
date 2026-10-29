@@ -10,6 +10,8 @@ import AdminSecurityModal from '../components/AdminSecurityModal'
 import { MSG as PASSWORD_MSG } from '../lib/adminPassword'
 import { getAdminMfaState, isAal2 } from '../lib/adminMfa'
 import CreateClientModal from '../components/CreateClientModal'
+import ServiceLifecycleModal from '../components/ServiceLifecycleModal'
+import { serviceSummary } from '../lib/serviceLifecycle'
 import { resendClientAccess, accessText } from '../lib/adminProvisioning'
 import { orgLifecycleActions, trialReportBadge, resendTrialReport } from '../lib/trialClosure'
 import { fetchOrgFindings, domainFindingsView, emptyFindingsText } from '../lib/adminFindings'
@@ -57,11 +59,8 @@ export function scoreGradeAdmin(s) {
   return 'F'
 }
 
-export function trialColor(dateStr) {
-  if (!dateStr) return C.t2
-  const daysLeft = Math.ceil((new Date(dateStr) - new Date()) / 86400000)
-  return daysLeft <= 7 ? C.red : C.t2
-}
+// Color de la vigencia en la tarjeta (serviceSummary: ok | warn | ended)
+const SERVICE_TONE = { ok: C.t2, warn: C.amberText, ended: C.t3 }
 
 // ─── Auth token ─────────────────────────────────────────────────────────────────
 async function getAuthToken() {
@@ -166,6 +165,7 @@ function OrgStatusBadge({ status }) {
     cancelled: { label: 'Cancelado', color: C.red,       bg: 'rgba(242,99,126,.1)',  border: 'rgba(242,99,126,.25)' },
     past_due:  { label: 'Vencido',   color: C.red,       bg: 'rgba(242,99,126,.1)',  border: 'rgba(242,99,126,.25)' },
     trial_ended: { label: 'Prueba finalizada', color: C.t2, bg: 'rgba(130,150,220,.08)', border: 'rgba(130,150,220,.25)' },
+    expired:   { label: 'Servicio vencido', color: C.t2, bg: 'rgba(130,150,220,.08)', border: 'rgba(130,150,220,.25)' },
   }
   const m = map[status] || { label: status || '—', color: C.t2, bg: C.card, border: C.border }
   return (
@@ -208,7 +208,7 @@ export default function Admin() {
   const [newAdmin, setNewAdmin]       = useState({ email: '', name: '' })
   const [addingAdmin, setAddingAdmin] = useState(false)
   const [error, setError]             = useState('')
-  const [stats, setStats]             = useState({ total: 0, active: 0, trialing: 0, trialEnded: 0, cancelled: 0, mrr: 0 })
+  const [stats, setStats]             = useState({ total: 0, active: 0, trialing: 0, trialEnded: 0, expired: 0, cancelled: 0, mrr: 0 })
   const [expandedOrgs,    setExpandedOrgs]    = useState({})
   const [findingsPanel,   setFindingsPanel]   = useState({})
   // Hallazgos por org, cargados bajo demanda: { [orgId]: { status: 'loading'|'success'|'error', findings?, error? } }
@@ -223,6 +223,7 @@ export default function Admin() {
   const [detailFindingId, setDetailFindingId] = useState(null)
   const [endTrialOrg,     setEndTrialOrg]     = useState(null)
   const [showCreateClient, setShowCreateClient] = useState(false)
+  const [serviceOrg,      setServiceOrg]      = useState(null)
   const [highlightOrg,    setHighlightOrg]    = useState(null)
   const [accessAction,    setAccessAction]    = useState({})
   const [reportResend,    setReportResend]    = useState({})
@@ -383,8 +384,9 @@ export default function Admin() {
     const trialing  = orgsWithData.filter(o => o.status === 'trialing')
     const cancelled = orgsWithData.filter(o => o.status === 'cancelled')
     const trialEnded = orgsWithData.filter(o => o.status === 'trial_ended')
+    const expired   = orgsWithData.filter(o => o.status === 'expired')
     const mrr       = active.reduce((sum, o) => sum + (planPrices[o.plan] || 0), 0)
-    setStats({ total: orgsWithData.length, active: active.length, trialing: trialing.length, trialEnded: trialEnded.length, cancelled: cancelled.length, mrr })
+    setStats({ total: orgsWithData.length, active: active.length, trialing: trialing.length, trialEnded: trialEnded.length, expired: expired.length, cancelled: cancelled.length, mrr })
     return 200
   }
 
@@ -522,7 +524,7 @@ export default function Admin() {
       })
       const data = await res.json()
       if (!data.ok) {
-        setModalError(data.error || 'Error al ejecutar la acción')
+        setModalError(data.message || data.error || 'Error al ejecutar la acción')
         setModalLoading(false)
         return
       }
@@ -831,6 +833,7 @@ export default function Admin() {
               { label: 'ACTIVOS',        value: stats.active,      color: C.greenText },
               { label: 'EN TRIAL',       value: stats.trialing,    color: '#aab8ff'   },
               { label: 'TRIAL FINALIZADO', value: stats.trialEnded, color: C.t2      },
+              { label: 'VENCIDOS',       value: stats.expired,     color: C.t2        },
               { label: 'CANCELADOS',     value: stats.cancelled,   color: C.red       },
               { label: 'MRR',            value: `$${stats.mrr}`,   color: C.greenText },
             ].map((kpi, i) => (
@@ -901,7 +904,7 @@ export default function Admin() {
 
               {orgs.map(org => {
                 const monitoring = org.primaryDomain?.monitoring_active
-                const tColor     = trialColor(org.trial_ends_at)
+                const service    = serviceSummary(org)
 
                 return (
                   <div key={org.id} id={`org-${org.id}`} style={{
@@ -950,11 +953,9 @@ export default function Admin() {
                               color: C.t2,
                             },
                             {
-                              label: 'TRIAL VENCE',
-                              value: org.trial_ends_at
-                                ? new Date(org.trial_ends_at).toLocaleDateString('es-AR')
-                                : '—',
-                              color: org.trial_ends_at ? tColor : C.t2,
+                              label: 'ACCESO Y VIGENCIA',
+                              value: `${service.type} · ${service.range}${service.note ? ` · ${service.note}` : ''}`,
+                              color: SERVICE_TONE[service.tone],
                             },
                           ].map(({ label, value, color }) => (
                             <div key={label}>
@@ -1068,6 +1069,7 @@ export default function Admin() {
                             )}
                           </div>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            {btnSm('Acceso y vigencia', () => setServiceOrg(org))}
                             {btnSm('Facturación', () => { setModalError(''); setSelectedBilling(org.billing_type || 'stripe'); setActivateOnBilling(false); setModal({ type: 'billing-type', org }) })}
                             {(org.status === 'trialing' || org.status === 'active') && btnSm(accessAction[org.id]?.loading ? 'Enviando…' : 'Reenviar acceso', () => handleResendAccess(org, false))}
                             {orgLifecycleActions(org.status).endTrial && btnSm('Finalizar prueba', () => setEndTrialOrg(org), true)}
@@ -1683,6 +1685,17 @@ export default function Admin() {
           getToken={getAuthToken}
           onClose={async () => { setShowCreateClient(false); try { await loadOrgs() } catch { /* recargar a mano */ } }}
           onViewClient={viewClient}
+        />
+      )}
+
+      {serviceOrg && (
+        <ServiceLifecycleModal
+          org={serviceOrg}
+          scannerUrl={SCANNER_URL}
+          getToken={getAuthToken}
+          onClose={() => setServiceOrg(null)}
+          onSaved={async () => { try { await loadOrgs() } catch { /* recargar a mano */ } }}
+          onMfaRequired={() => { setServiceOrg(null); sendBackToMfa() }}
         />
       )}
 

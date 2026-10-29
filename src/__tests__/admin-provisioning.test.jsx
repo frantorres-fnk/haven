@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { provisioningPayload, accessText } from '../lib/adminProvisioning'
+import { commercialToday, addDays } from '../lib/serviceLifecycle'
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -44,7 +45,7 @@ const ORGS = [
 ]
 const CREATED = {
   ok: true, created: true,
-  organization: { id: 'org-penta', name: 'Penta', email: 'ana@penta.com.ar', status: 'trialing' },
+  organization: { id: 'org-penta', name: 'Penta', email: 'ana@penta.com.ar', status: 'trialing', service_type: 'trial', service_starts_at: '2026-11-01', service_ends_at: '2026-11-30' },
   owner: { email: 'ana@penta.com.ar', name: 'Ana Gómez', existing_user: false },
   primary_domain: { id: 'd-penta', domain: 'penta.com.ar', verified: false },
   access: { email_sent: true, verification_sent: true, login_url: 'https://haven.fenikso.io/login', temp_password: 'Tmp-Secret-123456789abcd', temp_password_expires_at: '2026-10-25T15:00:00Z' },
@@ -62,6 +63,7 @@ const buttons = (label) => [...container.querySelectorAll('button')].filter(b =>
 const click = async (el) => { await act(async () => { el.click() }); await flush() }
 const dialog = () => container.querySelector('[role="dialog"][aria-label="Crear cliente"]')
 const inputByLabel = (label) => [...dialog().querySelectorAll('label')].find(l => l.textContent.startsWith(label)).querySelector('input')
+const TODAY = commercialToday()
 const calls = (re) => fetchMock.mock.calls.filter(([u]) => re.test(String(u)))
 
 async function loginAdmin() {
@@ -87,7 +89,12 @@ async function fillAndSubmit(overrides = {}) {
     type(inputByLabel('Email owner'), v.email)
     type(inputByLabel('Dominio principal'), v.domain)
   })
-  if (overrides.lifecycle === 'active') await act(async () => { dialog().querySelector('input[value="active"]').click() })
+  if (overrides.serviceType) await act(async () => { dialog().querySelector(`input[value="${overrides.serviceType}"]`).click() })
+  if (overrides.preset) await click([...dialog().querySelectorAll('button')].find(b => b.textContent === overrides.preset))
+  await act(async () => {
+    if (overrides.starts) type(inputByLabel('Fecha de inicio'), overrides.starts)
+    if (overrides.ends) type(inputByLabel('Fecha de finalización'), overrides.ends)
+  })
   await click(buttons('Crear cliente').find(b => dialog().contains(b)))
 }
 
@@ -130,38 +137,72 @@ describe('producto único: sin planes visibles en /admin', () => {
 })
 
 describe('+ Crear cliente', () => {
-  it('payload: solo 5 campos; nunca plan, rol, org ni partner', () => {
-    const p = provisioningPayload({ name: ' Penta ', ownerName: 'Ana', ownerEmail: 'ana@penta.com.ar', domain: 'penta.com.ar', lifecycle: 'trialing', plan: 'advanced', partner_id: 'x' })
-    expect(p).toEqual({ name: 'Penta', owner_name: 'Ana', owner_email: 'ana@penta.com.ar', primary_domain: 'penta.com.ar', lifecycle: 'trialing' })
+  it('payload: datos del cliente + vigencia; nunca plan, rol, status, org ni partner', () => {
+    const p = provisioningPayload({ name: ' Penta ', ownerName: 'Ana', ownerEmail: 'ana@penta.com.ar', domain: 'penta.com.ar', service_type: 'trial', service_starts_at: '2026-11-01', service_ends_at: '2026-11-07', status: 'active', plan: 'advanced', partner_id: 'x' })
+    expect(p).toEqual({ name: 'Penta', owner_name: 'Ana', owner_email: 'ana@penta.com.ar', primary_domain: 'penta.com.ar', service_type: 'trial', service_starts_at: '2026-11-01', service_ends_at: '2026-11-07' })
+    expect(provisioningPayload({ name: 'X', service_type: 'manual', service_starts_at: '2026-11-01', service_ends_at: '2027-01-01' }).service_ends_at).toBeNull()
   })
 
   it('modal: campos de organización y servicio (Trial por defecto), sin selector de plan; botón deshabilitado hasta completar', async () => {
     await loginAdmin()
     await click(buttons('+ Crear cliente')[0])
     const d = dialog()
-    for (const t of ['Nombre de organización *', 'Contacto principal / owner *', 'Email owner *', 'Dominio principal *', 'Trial', 'Activo']) expect(d.textContent).toContain(t)
+    for (const t of ['Nombre de organización *', 'Contacto principal / owner *', 'Email owner *', 'Dominio principal *', 'Trial', 'Contrato', 'Sin vencimiento', '7 días', '15 días', '30 días']) expect(d.textContent).toContain(t)
     expect(d.textContent).not.toMatch(/plan|elite|advanced|premium|facturación/i)
-    expect(d.querySelector('input[value="trialing"]').checked).toBe(true)
+    expect(d.querySelector('input[value="trial"]').checked).toBe(true)
+    // default: trial de 30 días desde hoy (editable, no hardcodeado)
+    expect(inputByLabel('Fecha de inicio').value).toBe(TODAY)
+    expect(inputByLabel('Fecha de finalización').value).toBe(addDays(TODAY, 29))
     expect(buttons('Crear cliente').find(b => d.contains(b)).disabled).toBe(true)
   })
 
-  it('crea (Trial): POST con los 5 campos y el token del admin; confirmación con resumen y contraseña temporal una vez', async () => {
+  it('crea (Trial 30 días por defecto): POST con datos + vigencia y el token del admin; confirmación con resumen y contraseña temporal una vez', async () => {
     await loginAdmin()
     await fillAndSubmit()
     const [, init] = calls(/\/admin\/organizations$/)[0]
-    expect(JSON.parse(init.body)).toEqual({ name: 'Penta', owner_name: 'Ana Gómez', owner_email: 'ana@penta.com.ar', primary_domain: 'penta.com.ar', lifecycle: 'trialing' })
+    expect(JSON.parse(init.body)).toEqual({ name: 'Penta', owner_name: 'Ana Gómez', owner_email: 'ana@penta.com.ar', primary_domain: 'penta.com.ar', service_type: 'trial', service_starts_at: TODAY, service_ends_at: addDays(TODAY, 29) })
     expect(init.headers.Authorization).toBe('Bearer tok-admin')
     const d = dialog()
     expect(d.textContent).toContain('Cliente creado correctamente')
-    for (const t of ['Penta', 'Ana Gómez · ana@penta.com.ar', 'penta.com.ar', 'Trial', 'Acceso enviado', 'Sí', 'se muestra una sola vez']) expect(d.textContent).toContain(t)
+    for (const t of ['Penta', 'Ana Gómez · ana@penta.com.ar', 'penta.com.ar', 'Trial', '01/11/2026 → 30/11/2026', 'Activo', 'Acceso enviado', 'Sí', 'se muestra una sola vez']) expect(d.textContent).toContain(t)
     expect(d.querySelector('[data-testid="temp-password"]').textContent).toBe('Tmp-Secret-123456789abcd')
     expect(d.textContent).not.toMatch(/elite|advanced|premium|plan/i)
   })
 
-  it('Activo → lifecycle active', async () => {
+  it('trial de 7 días (preset) y trial custom', async () => {
     await loginAdmin()
-    await fillAndSubmit({ lifecycle: 'active' })
-    expect(JSON.parse(calls(/\/admin\/organizations$/)[0][1].body).lifecycle).toBe('active')
+    await fillAndSubmit({ preset: '7 días' })
+    expect(JSON.parse(calls(/\/admin\/organizations$/)[0][1].body)).toMatchObject({ service_type: 'trial', service_starts_at: TODAY, service_ends_at: addDays(TODAY, 6) })
+  })
+
+  it('trial custom: fecha de fin elegida a mano (15/11 → 26/11 = 12 días)', async () => {
+    await loginAdmin()
+    await fillAndSubmit({ starts: addDays(TODAY, 1), ends: addDays(TODAY, 12) })
+    expect(JSON.parse(calls(/\/admin\/organizations$/)[0][1].body)).toMatchObject({ service_type: 'trial', service_starts_at: addDays(TODAY, 1), service_ends_at: addDays(TODAY, 12) })
+  })
+
+  it('Contrato con fecha de inicio y fin', async () => {
+    await loginAdmin()
+    await fillAndSubmit({ serviceType: 'contract', starts: '2027-01-01', ends: '2027-12-31' })
+    expect(JSON.parse(calls(/\/admin\/organizations$/)[0][1].body)).toMatchObject({ service_type: 'contract', service_starts_at: '2027-01-01', service_ends_at: '2027-12-31' })
+  })
+
+  it('Sin vencimiento: no pide fecha de fin y no la envía', async () => {
+    await loginAdmin()
+    await click(buttons('+ Crear cliente')[0])
+    await act(async () => { dialog().querySelector('input[value="manual"]').click() })
+    expect(dialog().textContent).not.toContain('Fecha de finalización')
+    await act(async () => { dialog().querySelector('[aria-label="Cerrar"]').click() })
+    await flush()
+    await fillAndSubmit({ serviceType: 'manual' })
+    expect(JSON.parse(calls(/\/admin\/organizations$/)[0][1].body)).toMatchObject({ service_type: 'manual', service_ends_at: null })
+  })
+
+  it('validación local: fin anterior al inicio o vencido no se envía', async () => {
+    await loginAdmin()
+    await fillAndSubmit({ serviceType: 'contract', starts: '2027-12-31', ends: '2027-01-01' })
+    expect(calls(/\/admin\/organizations$/)).toHaveLength(0)
+    expect(dialog().textContent).toContain('no puede ser anterior')
   })
 
   it('"Copiar acceso" copia URL, usuario y temporal (nada se guarda)', async () => {

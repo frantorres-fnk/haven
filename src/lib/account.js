@@ -94,8 +94,14 @@ export async function fetchOwnOrgStatus({ client = supabase, fetchImpl = fetch }
 export function accessEndedCopy(orgStatus) {
   if (orgStatus === 'trial_ended') {
     return {
-      text: 'El período de prueba de esta organización finalizó. Si querés continuar utilizando HAVEN, contactá a FENIKSO.',
-      cta: { label: 'Quiero continuar con HAVEN', href: `mailto:hola@fenikso.io?subject=${encodeURIComponent('Quiero continuar con HAVEN')}` },
+      text: 'Tu período de evaluación de HAVEN finalizó. El monitoreo se encuentra pausado.',
+      cta: { label: 'Contactar a FENIKSO', href: `mailto:hola@fenikso.io?subject=${encodeURIComponent('Quiero continuar con HAVEN')}` },
+    }
+  }
+  if (orgStatus === 'expired') {
+    return {
+      text: 'El servicio HAVEN se encuentra vencido. El monitoreo está pausado.',
+      cta: { label: 'Contactar a FENIKSO', href: `mailto:hola@fenikso.io?subject=${encodeURIComponent('Renovación del servicio HAVEN')}` },
     }
   }
   return { text: 'El acceso de esta organización a HAVEN ya no está activo. Si necesitás reactivarlo, contactá a FENIKSO.', cta: null }

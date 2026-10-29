@@ -1,16 +1,17 @@
 import { useRef, useState } from 'react'
-import { createClient, accessText, LIFECYCLES } from '../lib/adminProvisioning'
+import { createClient, accessText, defaultServiceForm } from '../lib/adminProvisioning'
+import { validateServiceForm, serviceSummary } from '../lib/serviceLifecycle'
+import { ServicePeriodFields } from './ServiceLifecycleModal'
 
 const K = {
   overlay: 'rgba(8,11,18,.85)', card: '#0d1526', border: 'rgba(130,150,220,.14)', borderHi: 'rgba(130,150,220,.22)', soft: 'rgba(130,150,220,.04)',
   input: '#101623', t1: '#e8ecf5', t2: '#9aa6c2', t3: '#7f8aa6', accent: '#5b6ef5', amber: '#f5b544', red: '#f2637e', green: '#5fe39c',
   title: "'Space Grotesk',sans-serif", body: "'Manrope',sans-serif", mono: "'JetBrains Mono',monospace",
 }
-const STATUS_LABEL = { trialing: 'Trial', active: 'Activo' }
 
 /** "+ Crear cliente": alta completa del tenant vía POST /admin/organizations. */
 export default function CreateClientModal({ scannerUrl, getToken, onClose, onCreated, onViewClient }) {
-  const [form, setForm] = useState({ name: '', ownerName: '', ownerEmail: '', domain: '', lifecycle: 'trialing' })
+  const [form, setForm] = useState(() => ({ name: '', ownerName: '', ownerEmail: '', domain: '', ...defaultServiceForm() }))
   const [fields, setFields] = useState({})
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -25,6 +26,8 @@ export default function CreateClientModal({ scannerUrl, getToken, onClose, onCre
   async function submit(e) {
     e.preventDefault()
     if (inFlight.current || !complete) return
+    const local = validateServiceForm(form)
+    if (Object.keys(local).length) { setFields(local); setError('Revisá los datos marcados.'); return }
     inFlight.current = true
     setSubmitting(true)
     setError('')
@@ -60,7 +63,9 @@ export default function CreateClientModal({ scannerUrl, getToken, onClose, onCre
             <Row label="Organización" value={result.organization.name} />
             <Row label="Owner" value={result.owner ? `${result.owner.name} · ${result.owner.email}` : (result.owners ?? []).join(', ')} mono />
             <Row label="Dominio principal" value={result.primary_domain ? `${result.primary_domain.domain}${result.primary_domain.verified ? '' : ' (pendiente de confirmación por el owner)'}` : '—'} mono />
-            <Row label="Estado" value={STATUS_LABEL[result.organization.status] ?? result.organization.status} />
+            <Row label="Tipo" value={serviceSummary(result.organization).type} />
+            <Row label="Vigencia" value={serviceSummary(result.organization).range} mono />
+            <Row label="Estado" value={serviceSummary(result.organization).status} />
             <Row label="Acceso enviado" value={result.access?.email_sent === true ? 'Sí' : result.access?.email_sent === false ? 'No' : '—'} />
 
             {result.access?.temp_password && (
@@ -92,16 +97,7 @@ export default function CreateClientModal({ scannerUrl, getToken, onClose, onCre
             <Input label="Dominio principal *" placeholder="empresa.com" value={form.domain} onChange={set('domain')} error={fields.primary_domain} mono />
 
             <Section>Servicio</Section>
-            <div role="radiogroup" aria-label="Estado inicial" style={{ display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-              {LIFECYCLES.map(l => (
-                <label key={l.value} style={{ flex: '1 1 160px', display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
-                  border: `1px solid ${form.lifecycle === l.value ? K.accent : K.border}`, background: form.lifecycle === l.value ? 'rgba(91,110,245,.1)' : K.soft }}>
-                  <input type="radio" name="lifecycle" value={l.value} checked={form.lifecycle === l.value} onChange={set('lifecycle')} style={{ marginTop: 2, accentColor: K.accent }} />
-                  <span><span style={{ display: 'block', fontSize: 14, color: K.t1, fontWeight: 600 }}>{l.label}</span><span style={{ fontSize: 12, color: K.t3 }}>{l.hint}</span></span>
-                </label>
-              ))}
-            </div>
-            {fields.lifecycle && <p style={{ color: K.red, fontSize: 12, margin: '0 0 8px' }}>{fields.lifecycle}</p>}
+            <ServicePeriodFields form={form} setForm={setForm} fields={fields} disabled={submitting} />
             <p style={{ fontSize: 12, color: K.t3, lineHeight: 1.6, margin: '10px 0 16px' }}>
               Se crea el usuario owner con contraseña temporal, la organización y el dominio principal. El owner recibe el email de bienvenida y otro para confirmar el dominio; el monitoreo empieza cuando lo confirma.
             </p>

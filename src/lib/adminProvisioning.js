@@ -1,18 +1,26 @@
 // Alta de clientes desde /admin. El Worker (verifyAdmin) decide todo lo sensible:
-// el frontend solo manda estos 5 campos; plan, rol u org nunca salen del navegador.
+// el frontend solo manda datos del cliente y la vigencia; plan, rol, status u org
+// nunca salen del navegador (el status lo deriva el Worker del tipo de servicio).
+import { commercialToday, trialEnd, servicePayload } from './serviceLifecycle'
 
-export const LIFECYCLES = [
-  { value: 'trialing', label: 'Trial', hint: 'Período de prueba (30 días)' },
-  { value: 'active', label: 'Activo', hint: 'Cliente en servicio' },
-]
+export const DEFAULT_TRIAL_DAYS = 30
+
+/** Vigencia inicial del alta: trial de 30 días desde hoy (editable). */
+export function defaultServiceForm(now = new Date()) {
+  const start = commercialToday(now)
+  return { service_type: 'trial', service_starts_at: start, service_ends_at: trialEnd(start, DEFAULT_TRIAL_DAYS) }
+}
 
 export function provisioningPayload(form) {
+  const { service_type, service_starts_at, service_ends_at } = servicePayload({
+    service_type: form.service_type, service_starts_at: form.service_starts_at, service_ends_at: form.service_ends_at,
+  })
   return {
     name: String(form.name ?? '').trim(),
     owner_name: String(form.ownerName ?? '').trim(),
     owner_email: String(form.ownerEmail ?? '').trim(),
     primary_domain: String(form.domain ?? '').trim(),
-    lifecycle: form.lifecycle === 'active' ? 'active' : 'trialing',
+    service_type, service_starts_at, service_ends_at,
   }
 }
 
